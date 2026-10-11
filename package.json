@@ -1,0 +1,22 @@
+{
+  "name": "header-analyzer",
+  "version": "1.0.0",
+  "description": "Analyse the security headers of a raw HTTP response, entirely in the browser.",
+  "homepage": "https://tools.frankheat.io/headers/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/frankheat/header-analyzer.git"
+  },
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test",
+    "build": "node scripts/build.mjs",
+    "sources": "node scripts/sources.mjs",
+    "verify-sources": "node scripts/verify-sources.mjs",
+    "check": "node --test && node scripts/sources.mjs --check && node scripts/build.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
