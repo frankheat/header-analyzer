@@ -96,7 +96,7 @@ legacy headers.
 
 ## Findings list
 
-Besides the detailed report, the findings are summed up as one line per header:
+Besides the detailed report, the findings can be copied as one line per header:
 
 ```
 <Header>: <status>. <brief description>.
@@ -110,23 +110,23 @@ Besides the detailed report, the findings are summed up as one line per header:
 | Deprecated | The header uses an obsolete or no longer recommended feature (X-XSS-Protection, Expect-CT, X-Download-Options, X-Frame-Options ALLOW-FROM, obsolete CSP directives). |
 
 - **Listed:** every finding with a severity. OK notes never are.
-- **All / Confirmed / To confirm:** three chips choose what the list shows: every
-  finding (the default), only those the response settles, or only those that
-  need a check (each ending with "(to confirm)"). A header with both kinds
+- **All / Confirmed / To confirm:** the copy menu chooses what the list holds:
+  every finding, only those the response settles, or only those that need a
+  check (each ending with "(to confirm)"). A header with both kinds
   appears under Confirmed and under To confirm, each time with the findings of
   that kind.
 - **Several problems in one header:** each header appears once. The line takes the
   status of its most severe problem (on a tie: Missing, then Misconfigured, then
   Deprecated, then Duplicated). The short descriptions are joined with `; ` from most
   to least severe; at most three are shown, and the rest are counted as "and N more".
-  In the interface the header name links to its detailed row, and hovering the line
-  shows every problem.
+  The detailed row of the header lists every problem.
 - **Order:** by the most severe problem of each header.
 - **Once per header:** in each of the three lists a header has at most one line.
 
-The list is shown first in the results; its copy button puts the list as
-currently shown (All, Confirmed or To confirm) on the clipboard as a bulleted
-list.
+The **Copy findings** button, next to the result filters, puts the chosen list
+on the clipboard as a bulleted list, and says how many lines it copied. Where
+the page may not write to the clipboard, the list opens in a dialog, already
+selected, to copy by hand.
 
 ---
 

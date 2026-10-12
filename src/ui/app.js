@@ -73,7 +73,6 @@
     profile: HL.profiles.getProfile(storage.get('profile')).id,
     filter: 'all',
     query: '',
-    listShow: 'all',
     report: null,
     open: new Set(),
     lastInput: null,
@@ -173,10 +172,8 @@
     if (focusButton) button.focus();
   }
 
-  function initMenu(buttonId, menuId, onAction) {
-    const button = $(buttonId);
-    const menu = $(menuId);
-    const items = () => [...menu.querySelectorAll('button')];
+  function initMenu(button, menu, onAction) {
+    const items = () => [...menu.querySelectorAll('button:not(:disabled)')];
 
     button.addEventListener('click', () => {
       if (openMenu && openMenu.menu === menu) { closeMenu(false); return; }
@@ -272,7 +269,7 @@
     }
     if (!report.ok) return [errorState('Nothing to analyse', report.error)];
 
-    const nodes = [findingListCard(report)];
+    const nodes = [];
     if (report.notes.length) nodes.push(notesCard(report.notes));
     nodes.push(filterBar(report));
     nodes.push(...listSections(report));
@@ -283,81 +280,38 @@
     return String(detail || '').split('\n').slice(0, 6).join('\n');
   }
 
-  /** The bulleted list: one `<Header>: <status>. <brief>.` line per finding. */
-  const LIST_SHOW = [['all', 'All'], ['confirmed', 'Confirmed'], ['toConfirm', 'To confirm']];
+  /**
+   * The findings list for a report: one `- <Header>: <status>. <brief>.` line
+   * per header, copied from a menu. All, only the findings the response
+   * settles, or only those to confirm.
+   */
+  const LIST_SHOW = [
+    ['all', 'All findings', 'Every header with a finding'],
+    ['confirmed', 'Confirmed', 'Settled by the response itself'],
+    ['toConfirm', 'To confirm', 'Depend on a check the response cannot show'],
+  ];
 
-  function findingListCard(report) {
-    const lines = HL.engine.findingList(report, { show: state.listShow });
-
-    // M3 filter chips behaving as a single-choice group, as in the filter bar.
-    const chips = el('div', { className: 'chip-set', attrs: { role: 'radiogroup', 'aria-label': 'List' } });
-    for (const [id, label] of LIST_SHOW) {
+  function copyMenu(report) {
+    const button = el('button', {
+      className: 'tonal-button',
+      attrs: { type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-controls': 'copy-menu', id: 'copy-button' },
+    }, icon('i-copy'), 'Copy findings', icon('i-expand', 'trailing'));
+    const menu = el('div', { className: 'menu', attrs: { id: 'copy-menu', role: 'menu', 'aria-labelledby': 'copy-button' } });
+    menu.hidden = true;
+    for (const [id, label, detail] of LIST_SHOW) {
       const count = HL.engine.findingList(report, { show: id }).length;
-      chips.append(el('button', {
-        className: 'filter-chip',
-        attrs: { type: 'button', role: 'radio', 'aria-checked': String(state.listShow === id), tabindex: state.listShow === id ? 0 : -1, 'data-list-show': id },
-      }, icon('i-check', 'chip-check'), `${label} · ${count}`));
+      menu.append(el('button', {
+        className: 'two-line',
+        attrs: { type: 'button', role: 'menuitem', 'data-show': id, disabled: !count },
+      }, el('span', null, `${label} · ${count}`, el('span', { className: 'menu-detail', text: detail }))));
     }
-    initSegmented(chips, (btn) => {
-      if (state.listShow === btn.dataset.listShow) return;
-      state.listShow = btn.dataset.listShow;
-      refreshList(state.listShow);
+    initMenu(button, menu, (item) => {
+      const lines = HL.engine.findingList(report, { show: item.dataset.show });
+      const n = `${lines.length} finding${lines.length === 1 ? '' : 's'}`;
+      const done = { all: `${n} copied`, confirmed: `${lines.length} confirmed finding${lines.length === 1 ? '' : 's'} copied`, toConfirm: `${n} to confirm copied` }[item.dataset.show];
+      copyText(lines.map((l) => `- ${l.text}`).join('\n'), done);
     });
-
-    const list = lines.length
-      ? el('ul', { className: 'finding-list' }, lines.map((l) => el('li', {
-        className: `sev-${l.severity.toLowerCase()}`,
-        attrs: { title: l.items.map((it) => `${it.status}: ${it.brief}`).join('\n') },
-      },
-        el('span', { className: 'fl-text' },
-          el('button', {
-            className: 'fl-header', text: l.header,
-            attrs: { type: 'button', title: `Show the ${l.header} details` },
-            on: { click: () => revealRow(l.header) },
-          }), ': ',
-          el('span', { className: `fl-status fl-${l.status.toLowerCase()}`, text: l.status }), `. ${l.brief}.`),
-        badge(HL.models.Severity[l.severity], l.toConfirm))))
-      : el('p', { className: 'fl-empty', text: 'No findings to list with these options.' });
-
-    return el('section', { className: 'card findings-list-card', attrs: { 'aria-labelledby': 'fl-title', id: 'findings-list' } },
-      el('div', { className: 'fl-head' },
-        el('div', null,
-          el('h3', { text: 'Findings list', attrs: { id: 'fl-title' } }),
-          el('p', { className: 'subtitle', text: `${lines.length} finding${lines.length === 1 ? '' : 's'} · Header: Status. Description.` })),
-        el('button', {
-          className: 'icon-button',
-          attrs: { type: 'button', title: 'Copy the list', 'aria-label': 'Copy the findings list', disabled: !lines.length },
-          on: { click: () => copyText(lines.map((l) => `- ${l.text}`).join('\n'), 'Findings list copied') },
-        }, icon('i-copy'))),
-      chips,
-      list);
-  }
-
-  /** Open a header's row in the detailed list and bring it into view. */
-  function revealRow(headerName) {
-    const result = state.report && state.report.results.find((r) => r.name === headerName);
-    if (!result) return;
-    let row = document.querySelector(`.row[data-key="${result.key}"]`);
-    if (!row && (state.filter !== 'all' || state.query)) {
-      // Hidden by the current filter: show everything, then look again.
-      state.filter = 'all';
-      state.query = '';
-      render();
-      row = document.querySelector(`.row[data-key="${result.key}"]`);
-    }
-    if (!row) return;
-    row.open = true;
-    state.open.add(result.key);
-    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    row.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
-    row.querySelector('summary').focus({ preventScroll: true });
-  }
-
-  function refreshList(focusKey) {
-    const old = $('findings-list');
-    if (old && state.report && state.report.ok) old.replaceWith(findingListCard(state.report));
-    const again = focusKey && document.querySelector(`[data-list-show="${focusKey}"]`);
-    if (again) again.focus();
+    return el('div', { className: 'menu-anchor copy-anchor' }, button, menu);
   }
 
   function notesCard(notes) {
@@ -414,7 +368,7 @@
     });
     return el('div', { className: 'filter-bar' },
       el('label', { className: 'search-bar' }, icon('i-search'), input),
-      chips);
+      el('div', { className: 'filter-row' }, chips, copyMenu(report)));
   }
 
   function listSections(report) {
@@ -531,24 +485,44 @@
     runAnalysis(true);
   }
 
+  /** Copy through the old selection API, for pages where the clipboard API is refused. */
+  function copyBySelection(text) {
+    const ta = el('textarea', { attrs: { readonly: true, 'aria-hidden': 'true' } });
+    ta.value = text;
+    ta.className = 'visually-hidden';
+    document.body.append(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (_) { ok = false; }
+    ta.remove();
+    return ok;
+  }
+
+  /** Last resort: the text in a dialog, already selected, to copy by hand. */
+  function manualCopy(text) {
+    const area = el('textarea', { className: 'manual-copy-text', attrs: { readonly: true, rows: 10, 'aria-label': 'Text to copy' } });
+    area.value = text;
+    const dialog = el('dialog', { className: 'manual-copy', attrs: { 'aria-labelledby': 'manual-copy-title' } },
+      el('h3', { text: 'Copy manually', attrs: { id: 'manual-copy-title' } }),
+      el('p', { className: 'subtitle', text: 'This page may not write to the clipboard. The text is selected: press Ctrl+C (⌘C on a Mac).' }),
+      area,
+      el('div', { className: 'dialog-actions' },
+        el('button', { className: 'filled-button', text: 'Close', attrs: { type: 'button' }, on: { click: () => dialog.close() } })));
+    dialog.addEventListener('close', () => dialog.remove());
+    document.body.append(dialog);
+    dialog.showModal();
+    area.focus();
+    area.select();
+  }
+
   async function copyText(text, done) {
-    try {
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(text);
-      } else {
-        const ta = el('textarea', { attrs: { readonly: true, 'aria-hidden': 'true' } });
-        ta.value = text;
-        ta.className = 'visually-hidden';
-        document.body.append(ta);
-        ta.select();
-        const ok = document.execCommand('copy');
-        ta.remove();
-        if (!ok) throw new Error('copy failed');
-      }
-      toast(done);
-    } catch (_) {
-      toast('Copying is not allowed here: select the text and copy it manually');
+    let ok = false;
+    if (navigator.clipboard && window.isSecureContext) {
+      try { await navigator.clipboard.writeText(text); ok = true; } catch (_) { ok = false; }
     }
+    if (!ok) ok = copyBySelection(text);
+    if (ok) toast(done);
+    else manualCopy(text);
   }
 
   // ------------------------------------------------------------------- init
@@ -567,7 +541,7 @@
       samplesMenu.append(el('button', { className: 'two-line', attrs: { type: 'button', role: 'menuitem', 'data-sample': s.id } },
         icon('i-sparkles'), el('span', null, s.name, el('span', { className: 'menu-detail', text: s.detail }))));
     }
-    initMenu('samples-button', 'samples-menu', (item) => {
+    initMenu($('samples-button'), samplesMenu, (item) => {
       const s = HL.samples.find((x) => x.id === item.dataset.sample);
       if (s) loadText(s.text);
     });

@@ -43,12 +43,12 @@ curl -si https://example.com
   scale. A check that passes is **OK**, sometimes with a note that explains the
   result. [`RULES.md`](RULES.md) gives the source for every grade, and marks
   every case where Header Analyzer grades differently from a source, with the reason.
-- **A findings list.** A bulleted list with one line per header, in the form
+- **Findings ready for a report.** The **Copy findings** button copies one line
+  per header, in the form
   `<Header>: <Missing | Misconfigured | Duplicated | Deprecated>. <brief description>.`,
-  ready to copy into a report. Three chips choose what it shows: **All** findings,
-  only the **Confirmed** ones (settled by the response), or only those **To
-  confirm**. Each header appears once per list, and the copy button copies the
-  list as shown.
+  as a bulleted list. Its menu chooses what to copy: **All** findings, only the
+  **Confirmed** ones (settled by the response), or only those **To confirm**.
+  Each header appears once per list.
 - **A row for each header.** Its value, every finding, and either a recommendation
   or the check that settles it.
 - **Sources for every claim.** Each finding lists the passages it rests on (OWASP,

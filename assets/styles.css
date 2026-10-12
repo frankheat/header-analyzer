@@ -168,18 +168,18 @@ svg { fill: currentColor; }
 .skip-link:focus { top: 12px; }
 
 /* State layer: the M3 hover/press overlay, in the content colour. */
-.icon-button, .filled-button, .filter-chip, .segmented button, .menu button,
+.icon-button, .filled-button, .tonal-button, .filter-chip, .segmented button, .menu button,
 .row > summary, .notes summary, .sources > summary {
   position: relative; isolation: isolate;
 }
-.icon-button::after, .filled-button::after, .filter-chip::after, .segmented button::after,
+.icon-button::after, .filled-button::after, .tonal-button::after, .filter-chip::after, .segmented button::after,
 .menu button::after, .row > summary::after, .notes summary::after, .sources > summary::after {
   content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit;
   background: currentColor; opacity: 0; transition: opacity 0.15s linear; pointer-events: none;
 }
-:is(.icon-button, .filled-button, .filter-chip, .segmented button, .menu button, .row > summary, .notes summary, .sources > summary):hover:not(:disabled)::after { opacity: 0.08; }
-:is(.icon-button, .filled-button, .filter-chip, .segmented button, .menu button, .row > summary, .notes summary, .sources > summary):focus-visible::after { opacity: 0.1; }
-:is(.icon-button, .filled-button, .filter-chip, .segmented button, .menu button, .row > summary, .notes summary, .sources > summary):active:not(:disabled)::after { opacity: 0.12; }
+:is(.icon-button, .filled-button, .tonal-button, .filter-chip, .segmented button, .menu button, .row > summary, .notes summary, .sources > summary):hover:not(:disabled)::after { opacity: 0.08; }
+:is(.icon-button, .filled-button, .tonal-button, .filter-chip, .segmented button, .menu button, .row > summary, .notes summary, .sources > summary):focus-visible::after { opacity: 0.1; }
+:is(.icon-button, .filled-button, .tonal-button, .filter-chip, .segmented button, .menu button, .row > summary, .notes summary, .sources > summary):active:not(:disabled)::after { opacity: 0.12; }
 
 /* ---------------------------------------------------------- Top app bar */
 
@@ -316,6 +316,15 @@ svg { fill: currentColor; }
 .filled-button { background: var(--md-primary); color: var(--md-on-primary); padding-left: 16px; transition: box-shadow 0.15s linear; }
 .filled-button:hover { box-shadow: var(--elev-1); }
 .filled-button svg { width: 18px; height: 18px; }
+/* M3 filled tonal button: a secondary action that still stands out. */
+.tonal-button {
+  display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px;
+  border: 0; border-radius: 20px; background: var(--md-secondary-container); color: var(--md-on-secondary-container);
+  font-size: 14px; font-weight: 500; line-height: 20px; letter-spacing: 0.1px;
+}
+.tonal-button svg { width: 18px; height: 18px; fill: currentColor; }
+.tonal-button .trailing { margin-right: -4px; transition: transform 0.2s var(--ease); }
+.tonal-button[aria-expanded="true"] .trailing { transform: rotate(180deg); }
 
 /* ---------------------------------------------------------------- Results */
 
@@ -338,31 +347,7 @@ svg { fill: currentColor; }
 .empty-state details summary { cursor: pointer; font-weight: 500; color: var(--md-primary); }
 .empty-state pre { max-width: 100%; overflow: auto; margin: 8px 0 0; padding: 12px; border-radius: 8px; background: var(--md-surface-container-highest); font: 11px/1.5 var(--mono); }
 
-/* Findings list: one bulleted line per finding */
-.findings-list-card { padding: 20px 24px 16px; display: flex; flex-direction: column; gap: 12px; }
-.fl-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-.fl-head h3 { font-size: 22px; line-height: 28px; }
-.findings-list-card .filter-chip[aria-checked="false"] .chip-check { display: none; }
-.finding-list { margin: 4px 0 0; padding: 0 0 0 20px; display: flex; flex-direction: column; }
-.finding-list li { padding: 7px 0; font-size: 14px; line-height: 20px; overflow-wrap: anywhere; }
-.finding-list li + li { border-top: 1px solid var(--md-outline-variant); }
-.finding-list li::marker { color: var(--c); font-size: 1.2em; }
-.finding-list li { display: list-item; }
-.finding-list li > .fl-text { margin-right: 8px; }
-.finding-list li > .badge { vertical-align: 1px; height: 20px; padding: 0 6px; font-size: 11px; }
-.fl-header {
-  padding: 0; border: 0; background: none; color: inherit; cursor: pointer;
-  font: inherit; font-weight: 500; letter-spacing: inherit; text-align: left;
-  text-decoration: underline; text-decoration-color: var(--md-outline-variant); text-underline-offset: 3px;
-}
-.fl-header:hover { color: var(--md-primary); text-decoration-color: currentColor; }
 .row { scroll-margin-top: 88px; }
-.fl-status { font-weight: 500; }
-.fl-missing { color: var(--md-error); }
-.fl-misconfigured { color: var(--sev-medium); }
-.fl-duplicated { color: var(--md-primary); }
-.fl-deprecated { color: var(--md-on-surface-variant); }
-.fl-empty { color: var(--md-on-surface-variant); }
 
 /* Notes */
 .notes { overflow: hidden; }
@@ -379,7 +364,7 @@ svg { fill: currentColor; }
 .notes li + li { margin-top: 6px; }
 
 /* Search bar and filter chips */
-.filter-bar { display: flex; flex-direction: column; gap: 12px; }
+.filter-bar { position: relative; z-index: 5; display: flex; flex-direction: column; gap: 12px; }
 .search-bar {
   display: flex; align-items: center; gap: 16px; height: 56px; padding: 0 16px;
   border-radius: 28px; background: var(--md-surface-container-high); cursor: text;
@@ -391,6 +376,23 @@ svg { fill: currentColor; }
 .search-bar input::-webkit-search-cancel-button { filter: grayscale(1); }
 
 .chip-set { display: flex; flex-wrap: wrap; gap: 8px; }
+.filter-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+.copy-anchor { margin-left: auto; }
+.menu button:disabled { color: var(--md-on-surface); opacity: 0.38; cursor: default; }
+
+/* Manual copy dialog (M3 basic dialog) */
+.manual-copy {
+  width: min(560px, calc(100vw - 32px)); padding: 24px; border: 0; border-radius: 28px;
+  background: var(--md-surface-container-high); color: var(--md-on-surface); box-shadow: var(--elev-3);
+}
+.manual-copy::backdrop { background: rgba(0, 0, 0, 0.32); }
+.manual-copy h3 { margin: 0 0 8px; font-size: 24px; line-height: 32px; font-weight: 400; }
+.manual-copy .subtitle { margin: 0 0 16px; }
+.manual-copy-text {
+  width: 100%; resize: vertical; padding: 12px; border: 1px solid var(--md-outline); border-radius: 4px;
+  background: var(--md-surface); color: var(--md-on-surface); font: 13px/1.5 var(--mono);
+}
+.dialog-actions { display: flex; justify-content: flex-end; margin-top: 20px; }
 .filter-chip {
   display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 16px;
   border: 1px solid var(--md-outline); border-radius: 8px;
