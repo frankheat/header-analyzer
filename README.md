@@ -77,7 +77,9 @@ Two cases where the response itself makes a finding uncertain:
 
 - **Responses that are not pages.** On a JSON API, an image or a 3xx redirect, a
   missing CSP, X-Frame-Options or COOP is to confirm. OWASP notes these headers
-  protect nothing on a response the browser does not render.
+  protect nothing on a response the browser does not render. The check: open the
+  URL in a browser tab; if the data is shown inside another page, analyse that
+  page's response instead.
 - **HTML without a usable charset.** A `text/html` response with no `charset`, or
   one the browser does not recognise, is to confirm. The page can still declare
   the encoding with `<meta charset>`, which the headers do not show.

@@ -310,7 +310,8 @@ test('on a JSON response, missing CSP, X-Frame-Options and COOP become checks', 
     const f = fs[key];
     assert.ok(isContingentFinding(f), key);
     assert.equal(f.recommendation, '');
-    assert.ok(f.verify.includes('application/json') && f.verify.includes('?'), key);
+    assert.ok(f.verify.includes('application/json') && f.verify.includes('open this URL in a browser tab'), key);
+    assert.ok(f.verify.includes("that page's response"), key);  // where to look instead
   }
   assert.equal(fs['content-security-policy'].severity, S.MEDIUM);  // severity unchanged
   assert.equal(fs['cross-origin-opener-policy'].severity, S.LOW);

@@ -183,9 +183,12 @@ JSON API, that CSP [might be meaningless][cs-csp-api] on a REST API response
 that is not rendered, and that COOP [may not make sense][cs-coop-api] for REST
 APIs. So when the response is evidently not a page (a Content-Type other than
 HTML, XHTML, SVG or XML, or a 3xx redirect other than 304), a missing CSP,
-X-Frame-Options or COOP keeps its severity but becomes **to confirm**: is this
-response ever shown by a browser as a page? With an HTML Content-Type, or none
-at all, nothing changes. The type is read as [Fetch extracts it][fetch-mime],
+X-Frame-Options or COOP keeps its severity but becomes **to confirm**. The check
+is to open the URL in a browser tab, also with a wrong parameter so that an
+error page shows up if there is one. Only data or a redirect: nothing to report
+on this response; when the data ends up inside a page, it is that page's
+response that needs the header, and the one to analyse. A web page: the finding
+stands. With an HTML Content-Type, or none at all, nothing changes. The type is read as [Fetch extracts it][fetch-mime],
 the same way the Content-Type check reads it.
 
 ### Duplicate headers

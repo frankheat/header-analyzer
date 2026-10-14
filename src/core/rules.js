@@ -1228,7 +1228,7 @@
   }
 
   function pageOnlyVerify(reason, canonical) {
-    return `${reason}, and OWASP notes that ${canonical} protects nothing on a response that is not rendered. Is this response ever shown by a browser as a page, for instance because the same URL can also return HTML? If it is not, there is nothing here. If it is, this stands.`;
+    return `${reason}, and ${canonical} only protects a page. To check, open this URL in a browser tab, also with a wrong parameter so that an error page shows up if there is one. If you only ever get data (JSON, a file) or a redirect, there is nothing here: when this data ends up inside a page, it is that page's response that needs this header, so analyse that one. If a web page appears, this stands.`;
   }
 
   /** 63072000 -> "2-year"; anything not a whole number of years stays in seconds. */

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <!-- The app never talks to the network: everything it analyses stays in this tab. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZpdEWBRZc8YWHOGmH0srr36MDMtAe/bE3Yl+XzWsXAE=' 'sha256-MKsx6UKX7XWi4yhxERzUlHj9t+w9KONOjiOuycXMoTU='; style-src 'sha256-z+GWRih/iyGAzkxJHXgCDxvRusDI/IKBQKG5gUSA/m0='; img-src data:; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZpdEWBRZc8YWHOGmH0srr36MDMtAe/bE3Yl+XzWsXAE=' 'sha256-u/OPexr0syU5KrdD81AD9lRAXplea4gVGsFG8TBW8O0='; style-src 'sha256-z+GWRih/iyGAzkxJHXgCDxvRusDI/IKBQKG5gUSA/m0='; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="color-scheme" content="light dark">
   <meta name="description" content="Header Analyzer analyses the security headers of a raw HTTP response, entirely in your browser.">
@@ -3694,7 +3694,7 @@ svg { fill: currentColor; }
   }
 
   function pageOnlyVerify(reason, canonical) {
-    return `${reason}, and OWASP notes that ${canonical} protects nothing on a response that is not rendered. Is this response ever shown by a browser as a page, for instance because the same URL can also return HTML? If it is not, there is nothing here. If it is, this stands.`;
+    return `${reason}, and ${canonical} only protects a page. To check, open this URL in a browser tab, also with a wrong parameter so that an error page shows up if there is one. If you only ever get data (JSON, a file) or a redirect, there is nothing here: when this data ends up inside a page, it is that page's response that needs this header, so analyse that one. If a web page appears, this stands.`;
   }
 
   /** 63072000 -> "2-year"; anything not a whole number of years stays in seconds. */
