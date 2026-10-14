@@ -396,6 +396,14 @@ Absent: **LOW**.
 Absent: **LOW**, to confirm, in both profiles. The header is [not
 standard][cs-xdns-nonstd] ([MDN][mdn-xdns-nonstd]).
 
+The check first asks whether the response is a web page: prefetching acts on
+[links and items referenced by the document][mdn-xdns-doc], so on data (JSON, a
+file) or a redirect there is nothing here, and the page that shows the data is
+the one to check. On a page, the finding stands when the page shows any of the
+OWASP conditions: [links to sites you do not control][cs-xdns], [sensitive or
+personal data][bp-xdns-pii], or input from users, which is what makes it
+[prone to HTML injection][bp-xdns-inj].
+
 | Condition | Severity |
 |---|---|
 | `off` | OK |
@@ -642,6 +650,7 @@ with the passage highlighted.
 - `mdn-object-src`: [MDN, CSP object-src][mdn-object-src]: “Therefore it is recommended to restrict this fetch-directive”
 - `mdn-pragma`: [MDN, Pragma][mdn-pragma]: “The Pragma header is not specified for HTTP responses and is therefore not a reliable replacement for the HTTP/1.1 Cache-Control header”
 - `mdn-prefetch`: [MDN, CSP prefetch-src][mdn-prefetch]: “Non-standard: This feature is not standardized.”
+- `mdn-xdns-doc`: [MDN, X-DNS-Prefetch-Control][mdn-xdns-doc]: “links that the user may choose to follow as well as URLs for items referenced by the document”
 - `mdn-xdns-nonstd`: [MDN, X-DNS-Prefetch-Control][mdn-xdns-nonstd]: “Non-standard: This feature is not standardized.”
 - `mdn-xpcdp`: [MDN, X-Permitted-Cross-Domain-Policies][mdn-xpcdp]: “Some security testing tools will still check for the presence of a X-Permitted-Cross-Domain-Policies: none header because it can mitigate the risk of an overly-permissive policy file added to your site by accident or through malicious actions.”
 - `mdn-xpcdp-none`: [MDN, X-Permitted-Cross-Domain-Policies][mdn-xpcdp-none]: “No policy files are allowed anywhere on the target server, including in a master policy file.”
@@ -870,6 +879,7 @@ with the passage highlighted.
 [mdn-object-src]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/object-src#:~:text=Therefore%20it%20is%20recommended%20to%20restrict%20this%20fetch%2Ddirective
 [mdn-pragma]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Pragma#:~:text=The%20Pragma%20header%20is%20not,for%20the%20HTTP%2F1.1%20Cache%2DControl%20header
 [mdn-prefetch]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/prefetch-src#:~:text=Non%2Dstandard%3A%20This%20feature%20is%20not%20standardized.
+[mdn-xdns-doc]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-DNS-Prefetch-Control#:~:text=links%20that%20the%20user%20may%20choose%20to%20follow%20as%20well%20as%20URLs%20for%20items%20referenced%20by%20the%20document
 [mdn-xdns-nonstd]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-DNS-Prefetch-Control#:~:text=Non%2Dstandard%3A%20This%20feature%20is%20not%20standardized.
 [mdn-xpcdp]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-Permitted-Cross-Domain-Policies#:~:text=Some%20security%20testing%20tools%20will,accident%20or%20through%20malicious%20actions.
 [mdn-xpcdp-none]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-Permitted-Cross-Domain-Policies#:~:text=No%20policy%20files%20are%20allowed%20anywhere%20on%20the%20target%20server%2C%20including%20in%20a%20master%20policy%20file.

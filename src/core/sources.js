@@ -323,6 +323,7 @@
     'mdn-xxp-warn': ['mdnXxp', 'in some cases, X-XSS-Protection can create XSS vulnerabilities in otherwise safe websites'],
     'mdn-xxp-block': ['mdnXxp', 'though this approach might be vulnerable to side-channel attacks if the website is embeddable in an'],
     'mdn-xdns-nonstd': ['mdnXdns', 'Non-standard: This feature is not standardized.'],
+    'mdn-xdns-doc': ['mdnXdns', 'links that the user may choose to follow as well as URLs for items referenced by the document'],
     'mdn-object-src': ['mdnObjectSrc', 'Therefore it is recommended to restrict this fetch-directive'],
     'owasp-rr-critical': ['owaspRr', { s: 'Overall Risk Severity', e: 'Critical', show: 'Overall Risk Severity: Critical only where impact is HIGH and likelihood is HIGH' }],
     'mdn-bamc': ['mdnBamc', 'Warning: This directive is marked as obsolete in the specification.'],

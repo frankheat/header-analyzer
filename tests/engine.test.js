@@ -345,6 +345,8 @@ test('only those three headers change on a non-page response', () => {
 test('X-DNS-Prefetch-Control asks about both OWASP conditions', () => {
   const f = analyze('HTTP/1.1 200 OK\r\nX-Nothing: x\r\n\r\n', 'basic').results.find((r) => r.key === 'x-dns-prefetch-control').findings[0];
   assert.ok(f.verify.includes('do not control'));              // Cheat Sheet
-  assert.ok(f.verify.includes('sensitive or personal data'));   // Secure Headers Project
-  assert.ok(f.verify.includes('HTML injection'));
+  assert.ok(f.verify.includes('personal or sensitive data'));   // Secure Headers Project
+  assert.ok(f.verify.includes('input from users'));             // where HTML injection happens
+  assert.ok(f.verify.startsWith('Is this response a web page?'));  // data or a redirect: check the page
+  assert.ok(f.sources.includes('mdn-xdns-doc'));
 });

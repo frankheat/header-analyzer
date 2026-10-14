@@ -881,7 +881,7 @@
     const H = 'X-DNS-Prefetch-Control';
     if (value.trim().toLowerCase() === 'off') return [finding(H, Severity.OK, 'X-DNS-Prefetch-Control: off', { sources: ['cs-xdns'] })];
     return [finding(H, ctx.absentSeverity, `X-DNS-Prefetch-Control: '${value}' (DNS prefetching enabled)`, {
-      sources: ['cs-xdns', 'bp-xdns-pii', 'bp-xdns-inj', 'cs-xdns-nonstd'],
+      sources: ['cs-xdns', 'bp-xdns-pii', 'bp-xdns-inj', 'mdn-xdns-doc', 'cs-xdns-nonstd'],
       brief: 'DNS prefetching is not disabled',
       description: DNS_PREFETCH_TEXT,
       verify: DNS_PREFETCH_VERIFY,
@@ -892,7 +892,7 @@
   // OWASP Secure Headers Project: add it to responses that "Return sensitive or
   // private content", or are "Prone to HTML injection". Either condition makes
   // it stand.
-  const DNS_PREFETCH_VERIFY = 'Does the page link to, or load anything from, domains you do not control (user-generated links, third-party widgets, comments)? Does this response carry sensitive or personal data, or reflect input an attacker could turn into an HTML injection? If any of these applies, this stands: set X-DNS-Prefetch-Control: off. If none does, prefetching reveals nothing worth protecting and there is nothing here.';
+  const DNS_PREFETCH_VERIFY = 'Is this response a web page? If it is data (JSON, a file) or a redirect, there is nothing here: check the page that shows this data instead. If it is a page, this stands when the page shows any of these: links to sites you do not control, personal or sensitive data, or input from users. Otherwise there is nothing here.';
 
   const DNS_PREFETCH_TEXT = 'DNS prefetching resolves domains linked in the page before the user clicks. The DNS resolver learns every hostname the page links to (internal services, private subdomains, an admin panel the page references) whether or not the user navigates there. And an attacker with HTML injection can exfiltrate data through it: <link rel=dns-prefetch> resolves before any CSP directive can stop it, so a page whose CSP blocks scripts, images and connections still leaks data through DNS queries to a resolver the attacker controls. The header is non-standard and only some browsers honour it.';
 
@@ -1170,7 +1170,7 @@
     'x-permitted-cross-domain-policies': ['adobe-default', 'adobe-master', 'mdn-xpcdp-none'],
     'cache-control': ['zap-10015', 'asvs-14.3.2', 'bp-cache', 'rfc9111-heuristic'],
     'clear-site-data': ['asvs-14.3.1', 'bp-csd-logout', 'csd-logout'],
-    'x-dns-prefetch-control': ['cs-xdns', 'bp-xdns-pii', 'bp-xdns-inj', 'cs-xdns-nonstd'],
+    'x-dns-prefetch-control': ['cs-xdns', 'bp-xdns-pii', 'bp-xdns-inj', 'mdn-xdns-doc', 'cs-xdns-nonstd'],
     'origin-agent-cluster': ['html-oac', 'mdn-docdomain-oac', 'mdn-docdomain-shared', 'chrome-docdomain-115'],
   };
 
