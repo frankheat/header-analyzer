@@ -45,7 +45,9 @@ curl -si https://example.com
   every case where Header Analyzer grades differently from a source, with the reason.
 - **Findings ready for a report.** The **Copy findings** button copies one line
   per header, in the form
-  `<Header>: <Missing | Misconfigured | Duplicated | Deprecated>. <brief description>.`,
+  `<Header>: <Missing | Misconfigured | Duplicated | Deprecated>. <brief description>.`
+  (Missing means absent where the header should be sent: a header that is
+  correct to omit, such as X-XSS-Protection, is never listed),
   as a bulleted list. Its menu chooses what to copy: **All** findings, only the
   **Confirmed** ones (settled by the response), or only those **To confirm**.
   Each header appears once per list.

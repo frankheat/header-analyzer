@@ -125,7 +125,7 @@ Besides the detailed report, the findings can be copied as one line per header:
 
 | Status | Meaning |
 |---|---|
-| Missing | The header is not present. |
+| Missing | The header is not present, and it should be. A header whose absence is the correct state (X-XSS-Protection, Expect-CT, CORS headers on a response that needs none) is never reported as missing. |
 | Misconfigured | The header is present, but its configuration is not secure (an empty value counts here: it is present, and browsers ignore it). |
 | Duplicated | The header is returned more than once. |
 | Deprecated | The header uses an obsolete or no longer recommended feature (X-XSS-Protection, Expect-CT, X-Download-Options, X-Frame-Options ALLOW-FROM, obsolete CSP directives). |
