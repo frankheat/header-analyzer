@@ -443,6 +443,8 @@ svg { fill: currentColor; }
 }
 .badge.contingent { background: transparent; border-color: var(--c); color: var(--c); }
 .badge-icon { width: 14px; height: 14px; }
+.row-badges { display: inline-flex; align-items: center; gap: 6px; }
+.to-confirm-marker { --c: var(--md-on-surface-variant); padding: 0 6px; gap: 2px; }
 
 .row-detail { display: flex; flex-direction: column; gap: 16px; padding: 4px 24px 24px 72px; }
 .value-block {
@@ -515,7 +517,7 @@ svg { fill: currentColor; }
   .top-app-bar .segmented button { flex: 1; min-width: 0; }
   #input { height: 240px; }
   .row > summary { grid-template-columns: 40px minmax(0, 1fr) 24px; }
-  .row > summary .badge { grid-column: 2; grid-row: 2; justify-self: start; }
+  .row > summary .row-badges { grid-column: 2; grid-row: 2; justify-self: start; }
   .row > summary .row-chevron { grid-column: 3; grid-row: 1 / span 2; }
   .row-detail { padding: 4px 16px 20px; }
 }

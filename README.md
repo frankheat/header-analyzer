@@ -77,7 +77,8 @@ the camera? Is this endpoint's CORS origin reflected or allowlisted? Does this
 response carry a signed-in user's data? Those findings carry the check that
 settles them and what each outcome means. Their severity is what the response
 shows; the worst case a check could reveal is stated in the check itself. They are
-marked `?`.
+marked `?`. A header whose badge is settled but that also holds findings to
+confirm shows how many beside it, as `+1 ?`.
 
 One case where the response itself makes a finding uncertain:
 

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <!-- The app never talks to the network: everything it analyses stays in this tab. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZpdEWBRZc8YWHOGmH0srr36MDMtAe/bE3Yl+XzWsXAE=' 'sha256-2jIficQ8m0Uu/5wlLKhKbbfLFAihRFsiFhiD3pikhtU='; style-src 'sha256-z+GWRih/iyGAzkxJHXgCDxvRusDI/IKBQKG5gUSA/m0='; img-src data:; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZpdEWBRZc8YWHOGmH0srr36MDMtAe/bE3Yl+XzWsXAE=' 'sha256-ibi4CtR+P32yBgq4DSygKBP5cYQmZJwiSEc44D7oyjw='; style-src 'sha256-/eSrNYAEpjMjDSYVfVVPQRcHku4hou+VlKtGwhQDpmo='; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="color-scheme" content="light dark">
   <meta name="description" content="Header Analyzer analyses the security headers of a raw HTTP response, entirely in your browser.">
@@ -456,6 +456,8 @@ svg { fill: currentColor; }
 }
 .badge.contingent { background: transparent; border-color: var(--c); color: var(--c); }
 .badge-icon { width: 14px; height: 14px; }
+.row-badges { display: inline-flex; align-items: center; gap: 6px; }
+.to-confirm-marker { --c: var(--md-on-surface-variant); padding: 0 6px; gap: 2px; }
 
 .row-detail { display: flex; flex-direction: column; gap: 16px; padding: 4px 24px 24px 72px; }
 .value-block {
@@ -528,7 +530,7 @@ svg { fill: currentColor; }
   .top-app-bar .segmented button { flex: 1; min-width: 0; }
   #input { height: 240px; }
   .row > summary { grid-template-columns: 40px minmax(0, 1fr) 24px; }
-  .row > summary .badge { grid-column: 2; grid-row: 2; justify-self: start; }
+  .row > summary .row-badges { grid-column: 2; grid-row: 2; justify-self: start; }
   .row > summary .row-chevron { grid-column: 3; grid-row: 1 / span 2; }
   .row-detail { padding: 4px 16px 20px; }
 }
@@ -4548,6 +4550,20 @@ svg { fill: currentColor; }
     }, contingent ? icon('i-help', 'badge-icon') : null, SEV_LABEL[severity]);
   }
 
+  /**
+   * Beside a settled badge: how many findings in the row still need a check,
+   * which the badge alone does not show (HSTS: a short max-age is certain, the
+   * preload is to confirm).
+   */
+  function toConfirmMarker(r, contingent) {
+    if (contingent) return null;
+    const n = r.findings.filter((f) => f.severity > Severity.OK && isContingent(f)).length;
+    if (!n) return null;
+    const label = `${n} more finding${n === 1 ? '' : 's'} to confirm`;
+    return el('span', { className: 'badge contingent to-confirm-marker', attrs: { title: label, 'aria-label': label } },
+      `+${n}`, icon('i-help', 'badge-icon'));
+  }
+
   /** The leading element of a list item: the severity icon in a tonal circle. */
   function avatar(severity, contingent) {
     return el('span', { className: `avatar ${sevClass(severity)}` }, icon(contingent ? 'i-help' : SEV_ICON[severity]));
@@ -4918,7 +4934,7 @@ svg { fill: currentColor; }
       el('div', { className: 'row-text' },
         el('div', { className: 'row-name', text: r.name }),
         el('div', { className: `row-value${absent || empty ? ' absent' : ''}`, text: absent ? 'Not present' : empty ? 'Empty value' : r.value })),
-      badge(worst, contingent),
+      el('span', { className: 'row-badges' }, badge(worst, contingent), toConfirmMarker(r, contingent)),
       icon('i-expand', 'row-chevron'));
 
     const detail = el('div', { className: 'row-detail' });

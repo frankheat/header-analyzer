@@ -62,6 +62,20 @@
     }, contingent ? icon('i-help', 'badge-icon') : null, SEV_LABEL[severity]);
   }
 
+  /**
+   * Beside a settled badge: how many findings in the row still need a check,
+   * which the badge alone does not show (HSTS: a short max-age is certain, the
+   * preload is to confirm).
+   */
+  function toConfirmMarker(r, contingent) {
+    if (contingent) return null;
+    const n = r.findings.filter((f) => f.severity > Severity.OK && isContingent(f)).length;
+    if (!n) return null;
+    const label = `${n} more finding${n === 1 ? '' : 's'} to confirm`;
+    return el('span', { className: 'badge contingent to-confirm-marker', attrs: { title: label, 'aria-label': label } },
+      `+${n}`, icon('i-help', 'badge-icon'));
+  }
+
   /** The leading element of a list item: the severity icon in a tonal circle. */
   function avatar(severity, contingent) {
     return el('span', { className: `avatar ${sevClass(severity)}` }, icon(contingent ? 'i-help' : SEV_ICON[severity]));
@@ -432,7 +446,7 @@
       el('div', { className: 'row-text' },
         el('div', { className: 'row-name', text: r.name }),
         el('div', { className: `row-value${absent || empty ? ' absent' : ''}`, text: absent ? 'Not present' : empty ? 'Empty value' : r.value })),
-      badge(worst, contingent),
+      el('span', { className: 'row-badges' }, badge(worst, contingent), toConfirmMarker(r, contingent)),
       icon('i-expand', 'row-chevron'));
 
     const detail = el('div', { className: 'row-detail' });
