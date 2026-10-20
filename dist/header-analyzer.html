@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <!-- The app never talks to the network: everything it analyses stays in this tab. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZpdEWBRZc8YWHOGmH0srr36MDMtAe/bE3Yl+XzWsXAE=' 'sha256-os6jxksEcCRu2uj2QmhXMqZsP0Hsn6Nc1ds1bABsvg0='; style-src 'sha256-BLN69Uw5uJto6Bp40+QouatslYDVpnU7280KdHwD4ss='; img-src data:; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZpdEWBRZc8YWHOGmH0srr36MDMtAe/bE3Yl+XzWsXAE=' 'sha256-2jIficQ8m0Uu/5wlLKhKbbfLFAihRFsiFhiD3pikhtU='; style-src 'sha256-z+GWRih/iyGAzkxJHXgCDxvRusDI/IKBQKG5gUSA/m0='; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="color-scheme" content="light dark">
   <meta name="description" content="Header Analyzer analyses the security headers of a raw HTTP response, entirely in your browser.">
@@ -515,10 +515,6 @@ svg { fill: currentColor; }
   box-shadow: var(--elev-3);
   animation: snack-in 0.25s var(--ease);
 }
-/* Which profile and mode produced the report */
-.report-context { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 0 4px; color: var(--md-on-surface-variant); font-size: 14px; line-height: 20px; }
-.report-context p { margin: 0; }
-.report-context strong { color: var(--md-on-surface); font-weight: 500; }
 @keyframes snack-in { from { opacity: 0; transform: translate(-50%, 16px); } }
 
 /* ------------------------------------------------------------- Responsive */
@@ -4785,7 +4781,7 @@ svg { fill: currentColor; }
     }
     if (!report.ok) return [errorState('Nothing to analyse', report.error)];
 
-    const nodes = [contextCard(report)];
+    const nodes = [];
     if (report.notes.length) nodes.push(notesCard(report.notes));
     nodes.push(filterBar(report));
     nodes.push(...listSections(report));
@@ -4828,16 +4824,6 @@ svg { fill: currentColor; }
       copyText(lines.map((l) => `- ${l.text}`).join('\n'), done);
     });
     return el('div', { className: 'menu-anchor copy-anchor' }, button, menu);
-  }
-
-  /** Which rules produced the report; in REST API mode, what the response is taken to be. */
-  function contextCard(report) {
-    const api = report.mode.id === 'api';
-    return el('div', { className: 'report-context' },
-      el('p', null,
-        el('strong', { text: `${report.profile.name} · ${report.mode.name}` }),
-        api ? ' · Evaluated as an API called from a browser.' : ''),
-      api ? sourcesNode(['rest-scope']) : null);
   }
 
   function notesCard(notes) {

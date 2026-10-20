@@ -504,8 +504,7 @@ tracking][rfc9110-etag-privacy]).
 
 The response is a call to an API read by a browser. The cheat sheet's table is
 for exactly that: headers that ["should be included in all API responses that
-may be consumed by browser clients"][rest-scope]. The report says so above the
-results. Headers are read, and duplicates resolved, as in Web page mode; what
+may be consumed by browser clients"][rest-scope]. Headers are read, and duplicates resolved, as in Web page mode; what
 changes is the criterion.
 
 ### Every API response (Basic and Extended)

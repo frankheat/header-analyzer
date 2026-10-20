@@ -295,7 +295,7 @@
     }
     if (!report.ok) return [errorState('Nothing to analyse', report.error)];
 
-    const nodes = [contextCard(report)];
+    const nodes = [];
     if (report.notes.length) nodes.push(notesCard(report.notes));
     nodes.push(filterBar(report));
     nodes.push(...listSections(report));
@@ -338,16 +338,6 @@
       copyText(lines.map((l) => `- ${l.text}`).join('\n'), done);
     });
     return el('div', { className: 'menu-anchor copy-anchor' }, button, menu);
-  }
-
-  /** Which rules produced the report; in REST API mode, what the response is taken to be. */
-  function contextCard(report) {
-    const api = report.mode.id === 'api';
-    return el('div', { className: 'report-context' },
-      el('p', null,
-        el('strong', { text: `${report.profile.name} · ${report.mode.name}` }),
-        api ? ' · Evaluated as an API called from a browser.' : ''),
-      api ? sourcesNode(['rest-scope']) : null);
   }
 
   function notesCard(notes) {
