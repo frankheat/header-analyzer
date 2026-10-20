@@ -9,8 +9,10 @@
 (function (HL) {
   'use strict';
 
+  // Clear-Site-Data belongs on a logout, not on every response, so it is a
+  // check for Extended only (RULES.md notes the deviation from Basic's sources).
   const EXTENDED_ONLY = [
-    'origin-agent-cluster', 'service-worker-allowed', 'content-disposition',
+    'clear-site-data', 'origin-agent-cluster', 'service-worker-allowed', 'content-disposition',
     'pragma', 'expires', 'etag', 'x-download-options',
   ];
 
@@ -45,5 +47,34 @@
     return Object.prototype.hasOwnProperty.call(PROFILES, id) ? PROFILES[id] : PROFILES[DEFAULT_PROFILE];
   }
 
-  HL.profiles = Object.freeze({ PROFILES, DEFAULT_PROFILE, getProfile });
+  /*
+   * What the response is, chosen by the user and never guessed: a web page, or
+   * a call to a REST API read by a browser. The mode changes how headers are
+   * judged; in REST API mode Basic keeps exactly the headers of the OWASP REST
+   * Security Cheat Sheet, while Extended keeps every header.
+   */
+  const REST_BASIC = Object.freeze(new Set([
+    'cache-control', 'content-security-policy', 'content-type', 'strict-transport-security',
+    'x-content-type-options', 'x-frame-options', 'permissions-policy', 'referrer-policy',
+    'access-control-allow-origin', 'access-control-allow-credentials',
+  ]));
+
+  const MODES = Object.freeze({
+    page: Object.freeze({ id: 'page', name: 'Web page' }),
+    api: Object.freeze({ id: 'api', name: 'REST API' }),
+  });
+
+  const DEFAULT_MODE = 'page';
+
+  function getMode(id) {
+    return Object.prototype.hasOwnProperty.call(MODES, id) ? MODES[id] : MODES[DEFAULT_MODE];
+  }
+
+  /** Whether `key` is evaluated under this profile and mode. */
+  function inScope(key, profile, mode) {
+    if (mode.id === 'api' && profile.id === 'basic') return REST_BASIC.has(key);
+    return !profile.skip.has(key);
+  }
+
+  HL.profiles = Object.freeze({ PROFILES, DEFAULT_PROFILE, getProfile, MODES, DEFAULT_MODE, getMode, REST_BASIC, inScope });
 })(globalThis.HeaderAnalyzer = globalThis.HeaderAnalyzer || {});

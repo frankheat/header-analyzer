@@ -19,7 +19,7 @@ Every check, condition and severity is documented in [`RULES.md`](RULES.md).
 page is static: what you paste is analysed in your browser and never sent anywhere.
 
 **Single file.** Open `dist/header-analyzer.html` in any modern browser. It is
-self-contained (≈270 KB) and works offline, and you can share it as an attachment.
+self-contained (≈290 KB) and works offline, and you can share it as an attachment.
 
 **From the folder.** Open `index.html` directly (double-click). This needs no
 build step and no server.
@@ -55,10 +55,16 @@ curl -si https://example.com
   ASVS, ZAP, RFCs, W3C/WHATWG specifications, MDN). A link opens the source
   scrolled to the exact passage, highlighted; code is linked by line range on a
   pinned commit. [`RULES.md`](RULES.md) links every rule the same way.
-- **Two fixed profiles.** *Basic* checks 18 headers: the core security headers,
+- **Two fixed profiles.** *Basic* checks 17 headers: the core security headers,
   the deprecated X-XSS-Protection and Expect-CT, and the charset of an HTML
-  Content-Type. *Extended* checks 25: it adds legacy headers and asks about HSTS
-  preload. Profiles cannot be edited, so every report is produced by the same rules.
+  Content-Type. *Extended* checks 25: it adds Clear-Site-Data (a check for
+  logout responses), legacy headers, and asks about HSTS preload. Profiles cannot be edited, so every report is produced by the same rules.
+- **Web page or REST API.** A second choice says what the response is; nothing
+  is guessed from it. *Web page* applies the rules above. *REST API* judges the
+  response as an API call read by a browser, on the
+  [OWASP REST Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html):
+  with Basic only the headers that cheat sheet lists, with Extended the same 25
+  headers, each with the criterion for an API response.
 - **Accessible.** Keyboard navigation, screen-reader announcements, reduced motion,
   and a light/dark switch that follows the system until you choose a theme.
   Severity is always written as a word, never shown by
@@ -73,13 +79,8 @@ settles them and what each outcome means. Their severity is what the response
 shows; the worst case a check could reveal is stated in the check itself. They are
 marked `?`.
 
-Two cases where the response itself makes a finding uncertain:
+One case where the response itself makes a finding uncertain:
 
-- **Responses that are not pages.** On a JSON API, an image or a 3xx redirect, a
-  missing CSP, X-Frame-Options or COOP is to confirm. OWASP notes these headers
-  protect nothing on a response the browser does not render. The check: open the
-  URL in a browser tab; if the data is shown inside another page, analyse that
-  page's response instead.
 - **HTML without a usable charset.** A `text/html` response with no `charset`, or
   one the browser does not recognise, is to confirm. The page can still declare
   the encoding with `<meta charset>`, which the headers do not show.
@@ -112,7 +113,7 @@ npm run build
 npm run verify-sources
 ```
 
-`npm test` runs ≈490 tests with `node:test`. They cover the parser, RFC 9651, every
+`npm test` runs ≈500 tests with `node:test`. They cover the parser, RFC 9651, every
 checker, the CSP engine, duplicates and correlations, and the findings list. They also
 include a 6,000-case fuzz run and static safety checks on the interface.
 `npm run build` regenerates `dist/header-analyzer.html`. `npm run verify-sources` fetches every
@@ -131,7 +132,7 @@ src/core/              the engine: runs unchanged in the browser and in Node
   csp.js               Content-Security-Policy (CSP Level 3)
   rules.js             every other header, duplicate resolution, orchestration
   correlations.js      checks that need more than one header
-  profiles.js          the two fixed profiles
+  profiles.js          the two fixed profiles and the two modes
   engine.js            analyze(), findingList()
 src/ui/                app.js (interface), samples.js, theme.js (theme before first paint)
 scripts/build.mjs      single-file build with hash-pinned CSP

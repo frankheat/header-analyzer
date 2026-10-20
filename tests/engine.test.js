@@ -44,7 +44,7 @@ test('a clean response under basic has no issue', () => {
   assert.ok(r.ok);
   const issues = r.results.flatMap((x) => x.findings).filter((f) => f.severity >= S.LOW);
   assert.deepEqual(issues.map((f) => f.title), []);
-  assert.equal(r.results.length, 18);
+  assert.equal(r.results.length, 17);
 });
 
 test('summary separates settled from to-confirm and marks an unconfirmed top', () => {
@@ -297,49 +297,159 @@ test('the em dash is not used anywhere in the project', () => {
   }
 });
 
-// ------------------------------------------------- headers that protect pages
-// OWASP Cheat Sheet: XFO gives no security on a redirect or JSON API, CSP and
-// COOP may be meaningless on a REST API. Their absence there is a check.
-const PAGE_ONLY = ['content-security-policy', 'x-frame-options', 'cross-origin-opener-policy'];
-const pageOnly = (text) => Object.fromEntries(analyze(text, 'basic').results
-  .filter((r) => PAGE_ONLY.includes(r.key)).map((r) => [r.key, r.findings[0]]));
+// ------------------------------------------------------------ the two modes
+// The user says what the response is; nothing is guessed from it.
+const byKey = (report) => Object.fromEntries(report.results.map((r) => [r.key, r]));
+const BARE = 'HTTP/1.1 200 OK\r\nX-Nothing: x\r\n\r\n';
 
-test('on a JSON response, missing CSP, X-Frame-Options and COOP become checks', () => {
-  const fs = pageOnly('HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{}');
-  for (const key of PAGE_ONLY) {
-    const f = fs[key];
-    assert.ok(isContingentFinding(f), key);
-    assert.equal(f.recommendation, '');
-    assert.ok(f.verify.includes('application/json') && f.verify.includes('open this URL in a browser tab'), key);
-    assert.ok(f.verify.includes("that page's response"), key);  // where to look instead
-  }
-  assert.equal(fs['content-security-policy'].severity, S.MEDIUM);  // severity unchanged
-  assert.equal(fs['cross-origin-opener-policy'].severity, S.LOW);
+test('Web page is the default mode, and an unknown mode falls back to it', () => {
+  assert.equal(analyze(BARE, 'basic').mode.id, 'page');
+  assert.equal(analyze(BARE, 'basic', 'nonsense').mode.id, 'page');
+  assert.equal(analyze(BARE, 'basic', 'api').mode.id, 'api');
 });
 
-test('on a redirect the same three become checks; on a 304 they do not', () => {
-  const redirect = pageOnly('HTTP/1.1 302 Found\r\nLocation: /x\r\n\r\n');
-  for (const key of PAGE_ONLY) assert.ok(redirect[key].verify.includes('302 redirect'), key);
-  const notModified = pageOnly('HTTP/1.1 304 Not Modified\r\nETag: "x"\r\n\r\n');
-  for (const key of PAGE_ONLY) assert.equal(notModified[key].verify, '', key);
-});
-
-test('on an HTML page, or with no Content-Type, the findings stay settled', () => {
-  for (const text of ['HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n\r\n',
-    'HTTP/1.1 200 OK\r\nX-Nothing: x\r\n\r\n', 'HTTP/1.1 200 OK\r\nContent-Type: image/svg+xml\r\n\r\n']) {
-    const fs = pageOnly(text);
-    for (const key of PAGE_ONLY) assert.ok(!isContingentFinding(fs[key]) && fs[key].recommendation, `${key} ${text}`);
+test('in Web page mode a JSON or redirect response is still judged as a page', () => {
+  for (const text of ['HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{}', 'HTTP/1.1 302 Found\r\nLocation: /x\r\n\r\n']) {
+    const r = byKey(analyze(text, 'basic', 'page'));
+    for (const key of ['content-security-policy', 'x-frame-options', 'cross-origin-opener-policy']) {
+      const f = r[key].findings[0];
+      assert.ok(!isContingentFinding(f) && f.recommendation, `${key} ${text}`);
+    }
+    assert.equal(r['content-security-policy'].findings[0].severity, S.MEDIUM);
   }
 });
 
-test('only those three headers change on a non-page response', () => {
-  const json = analyze('HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n', 'basic');
-  const html = analyze('HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n', 'basic');
-  for (const r of json.results) {
-    if (PAGE_ONLY.includes(r.key) || r.key === 'content-type') continue;
-    const h = html.results.find((x) => x.key === r.key);
-    assert.deepEqual(r.findings.map((f) => [f.severity, f.verify]), h.findings.map((f) => [f.severity, f.verify]), r.key);
+test('no check in Web page mode asks whether the response is a page or an API', () => {
+  const r = analyze('HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n', 'extended', 'page');
+  for (const res of r.results) {
+    for (const f of res.findings) assert.ok(!/web page\?|REST|an API/.test(f.verify), `${res.key}: ${f.verify}`);
   }
+});
+
+test('REST API + Basic shows exactly the headers of the OWASP REST Security Cheat Sheet', () => {
+  const keys = new Set(analyze(BARE, 'basic', 'api').results.map((r) => r.key));
+  const expected = ['cache-control', 'content-security-policy', 'content-type', 'strict-transport-security',
+    'x-content-type-options', 'x-frame-options', 'permissions-policy', 'referrer-policy'];
+  for (const k of expected) assert.ok(keys.has(k), k);
+  for (const k of keys) assert.ok(HL.profiles.REST_BASIC.has(k), k);
+});
+
+test('REST API + Extended keeps the same headers as Web page + Extended', () => {
+  const page = analyze(BARE, 'extended', 'page').results.map((r) => r.key);
+  const api = analyze(BARE, 'extended', 'api').results.map((r) => r.key);
+  assert.deepEqual(new Set(api), new Set(page));
+});
+
+test('REST API: the cheat sheet headers that every API response needs are settled LOW when missing', () => {
+  const r = byKey(analyze(BARE, 'basic', 'api'));
+  for (const key of ['content-type', 'x-frame-options']) {
+    const f = r[key].findings[0];
+    assert.equal(f.severity, S.LOW, key);
+    assert.ok(!isContingentFinding(f) && f.recommendation, key);
+  }
+  const fa = r['content-security-policy'].findings[0];
+  assert.equal(fa.severity, S.LOW);                       // LOW, not the page's MEDIUM
+  assert.match(fa.recommendation, /frame-ancestors 'none'/);
+  assert.equal(r['strict-transport-security'].findings[0].severity, S.MEDIUM);  // as in page mode
+});
+
+test('REST API: the defence-in-depth headers are checks about whether HTML can come back', () => {
+  const r = byKey(analyze(BARE, 'basic', 'api'));
+  const checks = [r['content-security-policy'].findings[1], r['permissions-policy'].findings[0], r['referrer-policy'].findings[0]];
+  for (const f of checks) {
+    assert.ok(isContingentFinding(f), f.title);
+    assert.ok(f.verify.startsWith('Can this API return HTML'), f.title);
+    assert.ok(f.sources.includes('rest-dd-uncertain'), f.title);
+  }
+});
+
+test('REST API: Cache-Control keeps the page rules, a check on user data, citing the REST cheat sheet', () => {
+  const missing = byKey(analyze(BARE, 'basic', 'api'))['cache-control'].findings[0];
+  assert.ok(isContingentFinding(missing));
+  assert.ok(missing.verify.startsWith('Does this response carry data belonging to a signed-in user?'));
+  assert.ok(missing.sources.includes('rest-cc'));
+  const shared = byKey(analyze('HTTP/1.1 200 OK\r\nCache-Control: public, max-age=3600\r\n\r\n', 'basic', 'api'))['cache-control'].findings[0];
+  assert.equal(shared.severity, S.MEDIUM);
+  assert.ok(isContingentFinding(shared) && shared.sources.includes('rest-cc'));
+  const page = byKey(analyze('HTTP/1.1 200 OK\r\nCache-Control: public, max-age=3600\r\n\r\n', 'basic', 'page'))['cache-control'].findings[0];
+  assert.ok(!page.sources.includes('rest-cc'));
+});
+
+test('REST API: the CSP is read for frame-ancestors and default-src only', () => {
+  const r = byKey(analyze("HTTP/1.1 200 OK\r\nContent-Security-Policy: default-src 'none'; frame-ancestors 'none'\r\n\r\n", 'basic', 'api'));
+  const fs = r['content-security-policy'].findings;
+  assert.equal(fs.length, 2);
+  assert.ok(fs.every((f) => f.severity === S.OK));
+  const self = byKey(analyze("HTTP/1.1 200 OK\r\nContent-Security-Policy: frame-ancestors 'self'\r\n\r\n", 'basic', 'api'));
+  assert.equal(self['content-security-policy'].findings[0].severity, S.LOW);
+  assert.match(self['content-security-policy'].findings[0].title, /frame-ancestors 'self'/);
+});
+
+test('REST API: X-Frame-Options must be DENY, Referrer-Policy no-referrer, Cache-Control no-store', () => {
+  const r = byKey(analyze('HTTP/1.1 200 OK\r\nX-Frame-Options: SAMEORIGIN\r\nReferrer-Policy: strict-origin\r\nCache-Control: private\r\n\r\n', 'basic', 'api'));
+  assert.equal(r['x-frame-options'].findings[0].severity, S.LOW);
+  assert.ok(!isContingentFinding(r['x-frame-options'].findings[0]));
+  assert.equal(r['referrer-policy'].findings[0].severity, S.LOW);
+  assert.equal(r['cache-control'].findings[0].severity, S.LOW);
+  const ok = byKey(analyze('HTTP/1.1 200 OK\r\nX-Frame-Options: DENY\r\nReferrer-Policy: no-referrer\r\nCache-Control: no-store\r\n\r\n', 'basic', 'api'));
+  for (const key of ['x-frame-options', 'referrer-policy', 'cache-control']) assert.equal(ok[key].findings[0].severity, S.OK, key);
+});
+
+test('REST API: Permissions-Policy is OK only when every feature it names is closed', () => {
+  const closed = byKey(analyze('HTTP/1.1 200 OK\r\nPermissions-Policy: camera=(), geolocation=()\r\n\r\n', 'basic', 'api'));
+  assert.equal(closed['permissions-policy'].findings[0].severity, S.OK);
+  const open = byKey(analyze('HTTP/1.1 200 OK\r\nPermissions-Policy: camera=*, geolocation=(self), usb=()\r\n\r\n', 'basic', 'api'));
+  const f = open['permissions-policy'].findings[0];
+  assert.equal(f.severity, S.LOW);
+  assert.ok(isContingentFinding(f));
+  assert.match(f.title, /camera, geolocation$/);
+});
+
+test('REST API: Content-Type text/html is a check; no charset is asked of JSON', () => {
+  const html = byKey(analyze('HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n', 'basic', 'api'));
+  assert.ok(isContingentFinding(html['content-type'].findings[0]));
+  const js = byKey(analyze('HTTP/1.1 200 OK\r\nContent-Type: Application/JavaScript; charset=utf-8\r\n\r\n', 'basic', 'api'));
+  assert.ok(isContingentFinding(js['content-type'].findings[0]));
+  assert.ok(js['content-type'].findings[0].verify.startsWith('Is the body really JavaScript?'));
+  const json = byKey(analyze('HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n', 'basic', 'api'));
+  assert.equal(json['content-type'].findings[0].severity, S.OK);
+});
+
+test('REST API: headers that only act on a document are not applicable', () => {
+  const r = byKey(analyze(BARE, 'extended', 'api'));
+  for (const key of ['cross-origin-opener-policy', 'cross-origin-embedder-policy', 'origin-agent-cluster', 'x-dns-prefetch-control']) {
+    assert.equal(r[key].findings.length, 1, key);
+    assert.equal(r[key].findings[0].severity, S.OK, key);
+    assert.match(r[key].findings[0].title, /not applicable to an API response/);
+  }
+});
+
+test('REST API: X-XSS-Protection stays a deprecated LOW, explained for an API', () => {
+  const api = byKey(analyze('HTTP/1.1 200 OK\r\nX-XSS-Protection: 1; mode=block\r\n\r\n', 'extended', 'api'))['x-xss-protection'].findings[0];
+  assert.equal(api.severity, S.LOW);
+  assert.match(api.description, /An API response is not rendered/);
+  const page = byKey(analyze('HTTP/1.1 200 OK\r\nX-XSS-Protection: 1; mode=block\r\n\r\n', 'basic', 'page'))['x-xss-protection'].findings[0];
+  assert.doesNotMatch(page.description, /API/);
+});
+
+test('REST API: X-Frame-Options next to a permissive frame-ancestors says it is replaced', () => {
+  const r = byKey(analyze('HTTP/1.1 200 OK\r\nContent-Security-Policy: frame-ancestors *\r\nX-Frame-Options: DENY\r\n\r\n', 'basic', 'api'));
+  assert.ok(r['x-frame-options'].findings.some((f) => /replaced by the CSP/.test(f.title)));
+});
+
+test('the API sample selects REST API mode; the others leave the mode alone', () => {
+  const api = HL.samples.find((s) => s.id === 'api');
+  assert.equal(api.mode, 'api');
+  assert.ok(HL.samples.filter((s) => s.id !== 'api').every((s) => !s.mode));
+  const r = analyze(api.text, 'basic', api.mode);
+  assert.ok(r.ok && r.results.some((x) => x.key === 'access-control-allow-origin' && x.findings.some((f) => f.severity > S.OK)));
+});
+
+test('REST API: a missing CORP asks about GET requests with user data and cookies', () => {
+  const f = byKey(analyze(BARE, 'extended', 'api'))['cross-origin-resource-policy'].findings[0];
+  assert.ok(isContingentFinding(f));
+  assert.ok(f.verify.startsWith('Does this endpoint answer GET requests with user data, authenticated by cookies?'));
+  assert.ok(f.sources.includes('webdev-corp-api'));
 });
 
 test('X-DNS-Prefetch-Control asks about both OWASP conditions', () => {
@@ -347,6 +457,5 @@ test('X-DNS-Prefetch-Control asks about both OWASP conditions', () => {
   assert.ok(f.verify.includes('do not control'));              // Cheat Sheet
   assert.ok(f.verify.includes('personal or sensitive data'));   // Secure Headers Project
   assert.ok(f.verify.includes('input from users'));             // where HTML injection happens
-  assert.ok(f.verify.startsWith('Is this response a web page?'));  // data or a redirect: check the page
-  assert.ok(f.sources.includes('mdn-xdns-doc'));
+  assert.ok(f.verify.startsWith('Does the page show'));        // Web page mode: it is a page
 });

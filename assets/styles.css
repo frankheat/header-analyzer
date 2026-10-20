@@ -502,6 +502,10 @@ svg { fill: currentColor; }
   box-shadow: var(--elev-3);
   animation: snack-in 0.25s var(--ease);
 }
+/* Which profile and mode produced the report */
+.report-context { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 0 4px; color: var(--md-on-surface-variant); font-size: 14px; line-height: 20px; }
+.report-context p { margin: 0; }
+.report-context strong { color: var(--md-on-surface); font-weight: 500; }
 @keyframes snack-in { from { opacity: 0; transform: translate(-50%, 16px); } }
 
 /* ------------------------------------------------------------- Responsive */

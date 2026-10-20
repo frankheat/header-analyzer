@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <!-- The app never talks to the network: everything it analyses stays in this tab. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZpdEWBRZc8YWHOGmH0srr36MDMtAe/bE3Yl+XzWsXAE=' 'sha256-oHfKNVSVWeCliZ2AYOmPAjuDDrv9iSMDlKsGUKwmnKc='; style-src 'sha256-z+GWRih/iyGAzkxJHXgCDxvRusDI/IKBQKG5gUSA/m0='; img-src data:; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZpdEWBRZc8YWHOGmH0srr36MDMtAe/bE3Yl+XzWsXAE=' 'sha256-os6jxksEcCRu2uj2QmhXMqZsP0Hsn6Nc1ds1bABsvg0='; style-src 'sha256-BLN69Uw5uJto6Bp40+QouatslYDVpnU7280KdHwD4ss='; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="color-scheme" content="light dark">
   <meta name="description" content="Header Analyzer analyses the security headers of a raw HTTP response, entirely in your browser.">
@@ -515,6 +515,10 @@ svg { fill: currentColor; }
   box-shadow: var(--elev-3);
   animation: snack-in 0.25s var(--ease);
 }
+/* Which profile and mode produced the report */
+.report-context { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 0 4px; color: var(--md-on-surface-variant); font-size: 14px; line-height: 20px; }
+.report-context p { margin: 0; }
+.report-context strong { color: var(--md-on-surface); font-weight: 500; }
 @keyframes snack-in { from { opacity: 0; transform: translate(-50%, 16px); } }
 
 /* ------------------------------------------------------------- Responsive */
@@ -593,6 +597,11 @@ svg { fill: currentColor; }
     <div class="segmented" role="radiogroup" aria-label="Profile" id="profile-control">
       <button type="button" role="radio" data-profile="basic" aria-checked="true"><svg class="seg-check" aria-hidden="true"><use href="#i-check"></use></svg>Basic</button>
       <button type="button" role="radio" data-profile="extended" aria-checked="false"><svg class="seg-check" aria-hidden="true"><use href="#i-check"></use></svg>Extended</button>
+    </div>
+
+    <div class="segmented" role="radiogroup" aria-label="Response type" id="mode-control">
+      <button type="button" role="radio" data-mode="page" aria-checked="true"><svg class="seg-check" aria-hidden="true"><use href="#i-check"></use></svg>Web page</button>
+      <button type="button" role="radio" data-mode="api" aria-checked="false"><svg class="seg-check" aria-hidden="true"><use href="#i-check"></use></svg>REST API</button>
     </div>
 
     <nav class="app-bar-actions" aria-label="Actions">
@@ -826,6 +835,14 @@ svg { fill: currentColor; }
     mdnDocDomain: ['MDN, Document.domain', 'https://developer.mozilla.org/en-US/docs/Web/API/Document/domain'],
     mdnPragma: ['MDN, Pragma', MDN + 'Pragma'],
     mdnOac: ['MDN, Origin-Agent-Cluster', MDN + 'Origin-Agent-Cluster'],
+    mdnCoep: ['MDN, Cross-Origin-Embedder-Policy', MDN + 'Cross-Origin-Embedder-Policy'],
+    mdnSetCookie: ['MDN, Set-Cookie', MDN + 'Set-Cookie'],
+    mdnCorp: ['MDN, Cross-Origin Resource Policy (CORP)', 'https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cross-Origin_Resource_Policy'],
+    sessionCs: ['OWASP Session Management Cheat Sheet', 'https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html'],
+    rest: ['OWASP REST Security Cheat Sheet', 'https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html'],
+    asvs4: ['OWASP ASVS 5.0, V4 API and Web Service', 'https://github.com/OWASP/ASVS/blob/master/5.0/en/0x13-V4-API-and-Web-Service.md'],
+    webdevHeaders: ['web.dev, Security headers quick reference', 'https://web.dev/articles/security-headers'],
+    orb: ['Opaque Response Blocking (ORB) explainer, WHATWG Fetch', 'https://github.com/annevk/orb/blob/main/README.md'],
     mdnAcao: ['MDN, Access-Control-Allow-Origin', MDN + 'Access-Control-Allow-Origin'],
     mdnXpcdp: ['MDN, X-Permitted-Cross-Domain-Policies', MDN + 'X-Permitted-Cross-Domain-Policies'],
     mdnObjectSrc: ['MDN, CSP object-src', MDN + 'Content-Security-Policy/object-src'],
@@ -1081,9 +1098,39 @@ svg { fill: currentColor; }
     'hstspreload-token': ['hstspreload', 'If a site sends the preload directive in an HSTS header, it is considered to be requesting inclusion in the preload list and may be submitted via the form on this site.'],
     'sonar-detect': ['sonar', 'A single occurrence of one of these escape sequences is usually enough to convince the auto-detection algorithm that the HTTP response body is encoded with ISO-2022-JP.'],
     'mdn-expectct': ['mdnExpectCt', 'Only Google Chrome and other Chromium-based browsers implemented Expect-CT, and Chromium has deprecated the header from version 107, because Chromium now enforces CT by default.'],
+    'mdn-xxp-pages': ['mdnXxp', 'stopped pages from loading when they detected reflected cross-site scripting'],
     'mdn-xxp-warn': ['mdnXxp', 'in some cases, X-XSS-Protection can create XSS vulnerabilities in otherwise safe websites'],
     'mdn-xxp-block': ['mdnXxp', 'though this approach might be vulnerable to side-channel attacks if the website is embeddable in an'],
     'mdn-xdns-nonstd': ['mdnXdns', 'Non-standard: This feature is not standardized.'],
+    // REST API mode: the OWASP REST Security Cheat Sheet is the reference.
+    'session-csd': ['sessionCs', 'This can be achieved by returning the Clear-Site-Data response header'],
+    'rest-stateless': ['rest', 'Stateful services are out of scope of this Cheat Sheet'],
+    'rest-scope': ['rest', 'The following headers should be included in all API responses that may be consumed by browser clients'],
+    'rest-cc': ['rest', 'Instructs compliant private and shared HTTP caches not to store the response or reuse it for another request'],
+    'rest-fa': ['rest', 'For an API response, there is no requirement to be framed in any of those elements.'],
+    'rest-fa-dnd': ['rest', 'This header protects against drag-and-drop style clickjacking attacks.'],
+    'rest-ct': ['rest', 'This must be specified as per the type of content returned by an API call.'],
+    'rest-ct-js': ['rest', 'Ensure sending intended content type headers in your response matching your body content e.g. application/json and not application/javascript.'],
+    'mimesniff-js': ['mimesniff', 'A JavaScript MIME type is any MIME type whose essence is one of the following'],
+    'rest-ct-guess': ['rest', 'If not specified or if specified incorrectly, a browser might attempt to guess the content type of the response.'],
+    'rest-xfo': ['rest', 'Still recommended for compatibility with older browsers that do not support CSP Level 2.'],
+    'rest-dd': ['rest', 'The headers below are only intended to provide additional security when responses are rendered as HTML.'],
+    'rest-dd-uncertain': ['rest', { s: 'However, if there is any uncertainty about the function of the headers', e: 'as part of a defense-in-depth approach', show: 'if there is any uncertainty about the function of the headers, or the types of information that the API returns (or may return in future), then it is recommended to include them as part of a defense-in-depth approach' }],
+    'rest-csp-dd': ['rest', 'The majority of CSP functionality only affects pages rendered as HTML.'],
+    'rest-rp': ['rest', 'Non-HTML responses should not trigger additional requests.'],
+    'rest-pp': ['rest', 'When browsers heed this header, it is used to control browser features via directives.'],
+    'rest-cors': ['rest', 'Be as specific as possible and as general as necessary when setting the origins of cross-domain calls.'],
+    'asvs-4.1.1': ['asvs4', { s: 'Verify that every HTTP response with a message body contains a Content-Type header field', e: 'that matches the actual content of the response', show: 'Verify that every HTTP response with a message body contains a Content-Type header field that matches the actual content of the response' }],
+    'webdev-corp-api': ['webdevHeaders', { s: 'You should apply this to resources that include sensitive information about the user', e: 'intended to be called only from the same origin', show: 'You should apply this to resources that include sensitive information about the user, or responses of an API that is intended to be called only from the same origin.' }],
+    'webdev-corp-all': ['webdevHeaders', 'All resources are recommended to send this header to indicate whether they allow being loaded by other websites.'],
+    'orb-blocklist': ['orb', 'An opaque-blocklisted MIME type is an HTML MIME type, JSON MIME type, or XML MIME type.'],
+    'mdn-corp-xssi': ['mdnCorp', 'to mitigate speculative side-channel attacks, like Spectre, as well as Cross-Site Script Inclusion attacks'],
+    'mdn-corp-nocors': ['mdnCorp', 'The policy is only effective for no-cors requests'],
+    'mdn-coep-doc': ['mdnCoep', "configures the current document's policy for loading and embedding cross-origin resources"],
+    'mdn-oac-doc': ['mdnOac', 'is used to request that the associated Document should be placed in an origin-keyed agent cluster'],
+    'mdn-samesite-lax': ['mdnSetCookie', { s: 'and for cross-site requests that meet both of the following criteria', e: 'The request uses a safe method', show: 'Lax: send the cookie for same-site requests, and for cross-site requests only on a top-level navigation with a safe method' }],
+    'mdn-samesite-default': ['mdnSetCookie', 'Some browsers use Lax as the default value if SameSite is not specified'],
+    'fetch-method-get': ['fetch', { s: 'A request has an associated method', e: 'GET', show: 'A request has an associated method. Unless stated otherwise it is GET.' }],
     'mdn-xdns-doc': ['mdnXdns', 'links that the user may choose to follow as well as URLs for items referenced by the document'],
     'mdn-object-src': ['mdnObjectSrc', 'Therefore it is recommended to restrict this fetch-directive'],
     'owasp-rr-critical': ['owaspRr', { s: 'Overall Risk Severity', e: 'Critical', show: 'Overall Risk Severity: Critical only where impact is HIGH and likelihood is HIGH' }],
@@ -2359,6 +2406,25 @@ svg { fill: currentColor; }
     });
   }
 
+  /**
+   * REST API mode reads only two directives (OWASP REST Security Cheat Sheet):
+   * frame-ancestors, and default-src as defence in depth. Across several
+   * policies a resource must pass every one, so one strict policy is enough.
+   */
+  function apiView(value) {
+    const policies = value.split(',').map((p) => p.trim()).filter((p) => p !== '').map(parsePolicy);
+    const only = (d, token) => d.lower.length === 0 || (d.lower.length === 1 && d.lower[0] === token);
+    const frame = policies.map((p) => p.directives.get('frame-ancestors')).filter(Boolean);
+    const dflt = policies.map((p) => p.directives.get('default-src')).filter(Boolean);
+    return {
+      frameNone: frame.some((d) => only(d, "'none'")),
+      frameRestricted: frame.some((d) => !d.lower.some(permissiveAncestor)),
+      frameAncestors: frame.length ? frame[0].tokens.join(' ') : null,
+      defaultNone: dflt.some((d) => only(d, "'none'")),
+      defaultSrc: dflt.length ? dflt[0].tokens.join(' ') : null,
+    };
+  }
+
   function evaluatePolicy(policy) {
     const out = new Collector();
     checkStructure(policy, out);
@@ -2409,6 +2475,7 @@ svg { fill: currentColor; }
   HL.csp = Object.freeze({
     evaluateCsp,
     restrictsFraming,
+    apiView,
     PERMISSIVE_FRAME_ANCESTORS,
   });
 })(globalThis.HeaderAnalyzer = globalThis.HeaderAnalyzer || {});
@@ -2425,8 +2492,10 @@ svg { fill: currentColor; }
 (function (HL) {
   'use strict';
 
+  // Clear-Site-Data belongs on a logout, not on every response, so it is a
+  // check for Extended only (RULES.md notes the deviation from Basic's sources).
   const EXTENDED_ONLY = [
-    'origin-agent-cluster', 'service-worker-allowed', 'content-disposition',
+    'clear-site-data', 'origin-agent-cluster', 'service-worker-allowed', 'content-disposition',
     'pragma', 'expires', 'etag', 'x-download-options',
   ];
 
@@ -2461,7 +2530,36 @@ svg { fill: currentColor; }
     return Object.prototype.hasOwnProperty.call(PROFILES, id) ? PROFILES[id] : PROFILES[DEFAULT_PROFILE];
   }
 
-  HL.profiles = Object.freeze({ PROFILES, DEFAULT_PROFILE, getProfile });
+  /*
+   * What the response is, chosen by the user and never guessed: a web page, or
+   * a call to a REST API read by a browser. The mode changes how headers are
+   * judged; in REST API mode Basic keeps exactly the headers of the OWASP REST
+   * Security Cheat Sheet, while Extended keeps every header.
+   */
+  const REST_BASIC = Object.freeze(new Set([
+    'cache-control', 'content-security-policy', 'content-type', 'strict-transport-security',
+    'x-content-type-options', 'x-frame-options', 'permissions-policy', 'referrer-policy',
+    'access-control-allow-origin', 'access-control-allow-credentials',
+  ]));
+
+  const MODES = Object.freeze({
+    page: Object.freeze({ id: 'page', name: 'Web page' }),
+    api: Object.freeze({ id: 'api', name: 'REST API' }),
+  });
+
+  const DEFAULT_MODE = 'page';
+
+  function getMode(id) {
+    return Object.prototype.hasOwnProperty.call(MODES, id) ? MODES[id] : MODES[DEFAULT_MODE];
+  }
+
+  /** Whether `key` is evaluated under this profile and mode. */
+  function inScope(key, profile, mode) {
+    if (mode.id === 'api' && profile.id === 'basic') return REST_BASIC.has(key);
+    return !profile.skip.has(key);
+  }
+
+  HL.profiles = Object.freeze({ PROFILES, DEFAULT_PROFILE, getProfile, MODES, DEFAULT_MODE, getMode, REST_BASIC, inScope });
 })(globalThis.HeaderAnalyzer = globalThis.HeaderAnalyzer || {});
 
 /* src/core/rules.js */
@@ -3097,6 +3195,8 @@ svg { fill: currentColor; }
   function checkCacheControl(value, ctx) {
     const CC = 'Cache-Control';
     const d = parseDirectives(value, ',');
+    // REST API mode: the same rules, with the REST Security Cheat Sheet cited too.
+    const finding = (h, sev, title, o) => HL.models.finding(h, sev, title, ctx.api && sev > Severity.OK ? { ...o, sources: [...o.sources, 'rest-cc'] } : o);
     const bare = (name) => d.has(name) && !d.get(name);
 
     if (![...d.keys()].some((k) => CACHE_DIRECTIVES.has(k))) {
@@ -3169,11 +3269,21 @@ svg { fill: currentColor; }
     })];
   }
 
-  function checkXXssProtection(value) {
+  function checkXXssProtection(value, ctx) {
     const H = 'X-XSS-Protection';
     const parts = value.split(';').map((p) => p.trim().toLowerCase());
     const flag = parts[0];
     const rest = parts.slice(1);
+    // REST API mode: the filter acted on pages, so what is left is an obsolete header.
+    if (ctx && ctx.api && flag === '1') {
+      const block = rest.includes('mode=block');
+      return [finding(H, Severity.LOW, block ? 'X-XSS-Protection: 1; mode=block (deprecated header)' : 'X-XSS-Protection: 1 enables the deprecated XSS filter', {
+        sources: ['mdn-xxp-pages', 'cs-xxp-rec', 'shp-deprecated'],
+        status: Status.DEPRECATED, brief: block ? 'Enables the obsolete XSS filter in block mode' : 'Enables the obsolete XSS filter',
+        description: 'The filter stopped pages from loading when it detected a reflected XSS attack, and the ways it could be abused all worked on a page being rendered. An API response is not rendered, so the filter has nothing to act on here. The header is still obsolete, and OWASP recommends not setting it, or setting it to 0. No current browser honours it.',
+        recommendation: 'Remove the header, or set it to 0.',
+      })];
+    }
     if (flag === '0') {
       return [finding(H, Severity.OK, 'X-XSS-Protection: 0 (deprecated header, disabled correctly)', {
         sources: ['cs-xxp-rec'],
@@ -3348,7 +3458,7 @@ svg { fill: currentColor; }
     const H = 'X-DNS-Prefetch-Control';
     if (value.trim().toLowerCase() === 'off') return [finding(H, Severity.OK, 'X-DNS-Prefetch-Control: off', { sources: ['cs-xdns'] })];
     return [finding(H, ctx.absentSeverity, `X-DNS-Prefetch-Control: '${value}' (DNS prefetching enabled)`, {
-      sources: ['cs-xdns', 'bp-xdns-pii', 'bp-xdns-inj', 'mdn-xdns-doc', 'cs-xdns-nonstd'],
+      sources: ['cs-xdns', 'bp-xdns-pii', 'bp-xdns-inj', 'cs-xdns-nonstd'],
       brief: 'DNS prefetching is not disabled',
       description: DNS_PREFETCH_TEXT,
       verify: DNS_PREFETCH_VERIFY,
@@ -3359,7 +3469,7 @@ svg { fill: currentColor; }
   // OWASP Secure Headers Project: add it to responses that "Return sensitive or
   // private content", or are "Prone to HTML injection". Either condition makes
   // it stand.
-  const DNS_PREFETCH_VERIFY = 'Is this response a web page? If it is data (JSON, a file) or a redirect, there is nothing here: check the page that shows this data instead. If it is a page, this stands when the page shows any of these: links to sites you do not control, personal or sensitive data, or input from users. Otherwise there is nothing here.';
+  const DNS_PREFETCH_VERIFY = 'Does the page show any of these: links to sites you do not control, personal or sensitive data, or input from users? If it does, this stands. If it shows none, there is nothing here.';
 
   const DNS_PREFETCH_TEXT = 'DNS prefetching resolves domains linked in the page before the user clicks. The DNS resolver learns every hostname the page links to (internal services, private subdomains, an admin panel the page references) whether or not the user navigates there. And an attacker with HTML injection can exfiltrate data through it: <link rel=dns-prefetch> resolves before any CSP directive can stop it, so a page whose CSP blocks scripts, images and connections still leaks data through DNS queries to a resolver the attacker controls. The header is non-standard and only some browsers honour it.';
 
@@ -3529,7 +3639,7 @@ svg { fill: currentColor; }
   const CSD_TYPES = new Set(['"cache"', '"cookies"', '"storage"', '"executionContexts"', '"clientHints"', '"prefetchCache"', '"prerenderCache"']);
   const CSD_WILDCARD = '"*"';
   const CSD_EXPECTED = ['"cache"', '"cookies"', '"storage"'];
-  const CSD_VERIFY = 'Is this a response that ends a session: a logout, a password change, an account deletion? If it is not, there is nothing here: this header only has a job where data should stop being available, and clearing a visitor\'s storage on an ordinary page would be the defect. If it is, what the response leaves behind stays readable to whoever uses the browser next.';
+  const CSD_VERIFY = 'Is this a response that ends a session: a logout, a password change, an account deletion? If it is not, there is nothing here: this header only has a job where data should stop being available, and clearing a visitor\'s storage on an ordinary response would be the defect. If it is, what the response leaves behind stays readable to whoever uses the browser next.';
 
   function checkClearSiteData(value) {
     const H = 'Clear-Site-Data';
@@ -3636,8 +3746,8 @@ svg { fill: currentColor; }
     'cross-origin-resource-policy': ['zap-90004-1', 'cs-corp'],
     'x-permitted-cross-domain-policies': ['adobe-default', 'adobe-master', 'mdn-xpcdp-none'],
     'cache-control': ['zap-10015', 'asvs-14.3.2', 'bp-cache', 'rfc9111-heuristic'],
-    'clear-site-data': ['asvs-14.3.1', 'bp-csd-logout', 'csd-logout'],
-    'x-dns-prefetch-control': ['cs-xdns', 'bp-xdns-pii', 'bp-xdns-inj', 'mdn-xdns-doc', 'cs-xdns-nonstd'],
+    'clear-site-data': ['asvs-14.3.1', 'bp-csd-logout', 'session-csd', 'csd-logout'],
+    'x-dns-prefetch-control': ['cs-xdns', 'bp-xdns-pii', 'bp-xdns-inj', 'cs-xdns-nonstd'],
     'origin-agent-cluster': ['html-oac', 'mdn-docdomain-oac', 'mdn-docdomain-shared', 'chrome-docdomain-115'],
   };
 
@@ -3670,33 +3780,197 @@ svg { fill: currentColor; }
     'origin-agent-cluster': 'Origin keying is not requested',
   };
 
-  // OWASP HTTP Headers Cheat Sheet: X-Frame-Options "does not provide any
-  // security" on a redirect or a JSON API, CSP "might be meaningless" on a REST
-  // API response that is not rendered, and COOP "may not make sense" for REST
-  // APIs. On a response that is evidently not a page, their absence is a check.
-  const PAGE_ONLY = new Set(['content-security-policy', 'x-frame-options', 'cross-origin-opener-policy']);
-  const PAGE_ONLY_SOURCES = {
-    'content-security-policy': ['cs-csp-api'],
-    'x-frame-options': ['cs-xfo-api'],
-    'cross-origin-opener-policy': ['cs-coop-api'],
-  };
-  const DOCUMENT_TYPES = new Set(['text/html', 'application/xhtml+xml', 'image/svg+xml', 'text/xml', 'application/xml']);
+  // ---------------------------------------------------------------------------
+  // REST API mode. The user says the response is a call to an API read by a
+  // browser; nothing here guesses it. The reference is the OWASP REST Security
+  // Cheat Sheet: six headers for every API response, three more as defence in
+  // depth for a response that might be rendered as HTML. Headers outside it
+  // keep their page rules, except those that only act on a document.
+  // ---------------------------------------------------------------------------
+  const API_HTML_VERIFY = 'Can this API return HTML, now or in a later version (an error page, say)? If it never can, there is nothing here: the OWASP REST Security Cheat Sheet calls this header unnecessary then. If it can, or you cannot be sure, this stands.';
+  const API_DEFENCE_SOURCES = ['rest-dd', 'rest-dd-uncertain'];
+  const API_CT_REC = 'Declare the type the API returns, such as Content-Type: application/json';
+  // MIME Sniffing: the JavaScript MIME types.
+  const JS_TYPES = new Set(['application/ecmascript', 'application/javascript', 'application/x-ecmascript', 'application/x-javascript',
+    'text/ecmascript', 'text/javascript', 'text/javascript1.0', 'text/javascript1.1', 'text/javascript1.2', 'text/javascript1.3',
+    'text/javascript1.4', 'text/javascript1.5', 'text/jscript', 'text/livescript', 'text/x-ecmascript', 'text/x-javascript']);
 
-  /** Why this response is evidently not a page a browser displays, or null. */
-  function notAPage(headers, context) {
-    const code = context && context.status ? context.status.code : null;
-    if (code >= 300 && code <= 399 && code !== 304) {
-      return `This is a ${code} redirect, which a browser follows rather than displays`;
+  const apiTitle = (header, empty) => (empty ? `${header}: present but empty` : `Missing ${header}`);
+  const apiStatus = (empty) => (empty ? Status.MISCONFIGURED : Status.MISSING);
+
+  function apiCsp(value, empty) {
+    const H = 'Content-Security-Policy';
+    const view = value === null ? { frameNone: false, frameRestricted: false, frameAncestors: null, defaultNone: false, defaultSrc: null } : HL.csp.apiView(value);
+    const out = [];
+    if (view.frameNone) {
+      out.push(finding(H, Severity.OK, "CSP: frame-ancestors 'none' (no site can frame this response)", { sources: ['rest-fa'] }));
+    } else {
+      const restricted = view.frameRestricted;
+      const title = value === null ? apiTitle(H, empty)
+        : view.frameAncestors === null ? "CSP: frame-ancestors is not set, so any site can frame this response"
+          : `CSP: frame-ancestors ${view.frameAncestors} lets ${restricted ? 'the sites it names' : 'any site'} frame this response`;
+      out.push(finding(H, Severity.LOW, title, {
+        status: value === null ? apiStatus(empty) : view.frameAncestors === null ? Status.MISSING : Status.MISCONFIGURED,
+        brief: restricted ? "frame-ancestors is not 'none'" : 'Any site can frame the response',
+        description: `${restricted ? 'The sites this directive names' : 'Any site'} can load this API response in a frame. A page that frames it can lead a signed-in user to drag the data shown in it into a field the page controls (drag-and-drop clickjacking). An API response never needs to be framed, so frame-ancestors 'none' costs nothing.`,
+        recommendation: "Content-Security-Policy: frame-ancestors 'none'",
+        sources: ['rest-fa', 'rest-fa-dnd', 'rest-scope', 'asvs-3.4.6'],
+      }));
     }
-    const contentType = headers.get('content-type');
-    const mime = contentType ? extractMimeType(contentType.join(', ')) : null;
-    if (mime && !DOCUMENT_TYPES.has(mime.essence)) return `Its Content-Type is ${mime.essence}, which a browser does not display as a page`;
-    return null;
+    if (view.defaultNone) {
+      out.push(finding(H, Severity.OK, "CSP: default-src 'none' (the response may load nothing)", { sources: ['rest-csp-dd'] }));
+    } else {
+      out.push(finding(H, Severity.LOW, view.defaultSrc === null ? "CSP: default-src 'none' is not set" : `CSP: default-src ${view.defaultSrc} instead of 'none'`, {
+        status: view.defaultSrc === null ? Status.MISSING : Status.MISCONFIGURED,
+        brief: "No default-src 'none' as defence in depth",
+        description: "If this response is ever rendered as HTML (through a wrong Content-Type, MIME sniffing or an HTML error page), default-src 'none' stops it loading or running anything, so markup injected into it goes nowhere. The OWASP REST Security Cheat Sheet lists it as defence in depth.",
+        verify: API_HTML_VERIFY,
+        sources: ['rest-csp-dd', ...API_DEFENCE_SOURCES],
+      }));
+    }
+    return out;
   }
 
-  function pageOnlyVerify(reason, canonical) {
-    return `${reason}, and ${canonical} only protects a page. To check, open this URL in a browser tab, also with a wrong parameter so that an error page shows up if there is one. If you only ever get data (JSON, a file) or a redirect, there is nothing here: when this data ends up inside a page, it is that page's response that needs this header, so analyse that one. If a web page appears, this stands.`;
+  function apiXFrameOptions(value, empty, ctx, framingByCsp) {
+    const H = 'X-Frame-Options';
+    if (value === null) {
+      return [finding(H, Severity.LOW, apiTitle(H, empty), {
+        status: apiStatus(empty), brief: framingByCsp ? 'Only CSP frame-ancestors restricts framing' : 'Framing is not restricted by this header',
+        description: framingByCsp
+          ? 'CSP frame-ancestors already restricts framing in every current browser. X-Frame-Options: DENY is the legacy fallback the OWASP REST Security Cheat Sheet still recommends, for browsers without CSP Level 2.'
+          : 'Neither this header nor CSP frame-ancestors stops another site framing this API response. The OWASP REST Security Cheat Sheet recommends X-Frame-Options: DENY next to frame-ancestors \'none\', for browsers without CSP Level 2.',
+        recommendation: 'X-Frame-Options: DENY',
+        sources: ['rest-xfo', 'rest-fa'],
+      })];
+    }
+    const page = checkXFrameOptions(value, ctx);
+    if (page.length === 1 && page[0].title.startsWith('X-Frame-Options: SAMEORIGIN')) {
+      return [finding(H, Severity.LOW, 'X-Frame-Options: SAMEORIGIN instead of DENY', {
+        status: Status.MISCONFIGURED, brief: 'SAMEORIGIN instead of DENY',
+        description: 'SAMEORIGIN still lets a page on this origin frame the response. An API response never needs to be framed, and DENY is the value the OWASP REST Security Cheat Sheet recommends.',
+        recommendation: 'X-Frame-Options: DENY',
+        sources: ['rest-xfo', 'rest-fa'],
+      })];
+    }
+    return page;
   }
+
+  function apiContentType(value, empty) {
+    const H = 'Content-Type';
+    if (value === null) {
+      return [finding(H, Severity.LOW, apiTitle(H, empty), {
+        status: apiStatus(empty), brief: 'Browsers may guess the content type',
+        description: 'Without a Content-Type, a browser may guess the type from the bytes and read this API response as HTML or script (MIME sniffing). The OWASP REST Security Cheat Sheet and ASVS 4.1.1 ask every response to declare it.',
+        recommendation: API_CT_REC,
+        sources: ['rest-ct', 'rest-ct-guess', 'asvs-4.1.1'],
+      })];
+    }
+    const mime = extractMimeType(value);
+    if (!mime) {
+      return [finding(H, Severity.LOW, `Content-Type: '${value}' is not a valid MIME type`, {
+        status: Status.MISCONFIGURED, brief: 'Invalid value, so browsers may guess the type',
+        description: 'A browser cannot read a type from this value, so it is in the same position as one that received none, and may guess the type from the bytes.',
+        recommendation: API_CT_REC,
+        sources: ['rest-ct-guess', 'fetch-mime', 'asvs-4.1.1'],
+      })];
+    }
+    if (mime.essence === 'text/html') {
+      return [finding(H, Severity.LOW, 'Content-Type: text/html on an API response', {
+        status: Status.MISCONFIGURED, brief: 'Declared as HTML',
+        description: 'The response declares itself HTML, so a browser that opens it renders it as a page, and anything injected into it can run as markup.',
+        verify: 'Is the body really HTML? If it is JSON, XML or anything else, this stands: declare the type the API returns, such as application/json. If the body is HTML, there is nothing here about the type itself.',
+        sources: ['rest-ct', 'asvs-4.1.1'],
+      })];
+    }
+    if (JS_TYPES.has(mime.essence)) {
+      return [finding(H, Severity.LOW, `Content-Type: ${mime.essence} on an API response`, {
+        status: Status.MISCONFIGURED, brief: 'Declared as JavaScript',
+        description: 'The response declares itself a script. Another site can include it with <script src>, and the browser runs it there with the user\'s cookies: data the script holds can be read by that site (Cross-Site Script Inclusion). A JSON type is not run that way.',
+        verify: 'Is the body really JavaScript? If it is JSON or anything else, this stands: declare the type the API returns, such as application/json. If the body is a script, there is nothing here about the type itself.',
+        sources: ['rest-ct-js', 'mimesniff-js', 'mdn-corp-xssi'],
+      })];
+    }
+    return [finding(H, Severity.OK, `Content-Type: ${mime.essence}`, { sources: ['rest-ct'] })];
+  }
+
+  function apiPermissionsPolicy(value, empty) {
+    const H = 'Permissions-Policy';
+    const sources = ['rest-pp', ...API_DEFENCE_SOURCES];
+    const parsed = value === null ? null : parseSfDictionary(value);
+    if (parsed && parsed.ok) {
+      // OK when every feature it names is closed with (), as in the cheat
+      // sheet's example; it need not name them all.
+      const open = [...parsed.dict].filter(([, member]) => {
+        const origins = ppAllowlist(member);
+        return origins === null || origins.length > 0;   // an invalid allowlist is dropped: the default applies
+      }).map(([feature]) => feature).sort();
+      if (!open.length) return [finding(H, Severity.OK, 'Permissions-Policy: every feature it names is disabled', { sources: ['rest-pp'] })];
+      return [finding(H, Severity.LOW, `Permissions-Policy: allows ${open.join(', ')}`, {
+        status: Status.MISCONFIGURED, brief: `${open.join(', ')} allowed`,
+        description: 'An API response has no use for these features. If it is ever rendered as HTML, the policy lets it, or what it embeds, use them. The OWASP REST Security Cheat Sheet lists this header as defence in depth, with an example that disables every feature with an empty allowlist ().',
+        verify: API_HTML_VERIFY,
+        sources,
+      })];
+    }
+    return [finding(H, Severity.LOW, value === null ? apiTitle(H, empty) : `Permissions-Policy: '${value}' is not a valid policy, so none is applied`, {
+      status: value === null ? apiStatus(empty) : Status.MISCONFIGURED, brief: 'Browser features are not restricted',
+      description: 'If this response is ever rendered as HTML, nothing restricts the browser features it could use. The OWASP REST Security Cheat Sheet lists this header as defence in depth, with an example policy that disables every feature.',
+      verify: API_HTML_VERIFY,
+      sources,
+    })];
+  }
+
+  function apiReferrerPolicy(value, empty) {
+    const H = 'Referrer-Policy';
+    let n = '';
+    if (value !== null) {
+      for (const token of splitOutsideQuotes(value, ',')) {
+        if (REFERRER_POLICIES.has(token.toLowerCase())) n = token.toLowerCase();
+      }
+    }
+    if (n === 'no-referrer') return [finding(H, Severity.OK, 'Referrer-Policy: no-referrer', { sources: ['rest-rp', 'referrer-last'] })];
+    const title = value === null ? apiTitle(H, empty)
+      : n === '' ? `Referrer-Policy: unrecognized value '${value}', so no policy is in force` : `Referrer-Policy: '${n}' instead of no-referrer`;
+    return [finding(H, Severity.LOW, title, {
+      status: value === null ? apiStatus(empty) : Status.MISCONFIGURED, brief: 'no-referrer is not set',
+      description: 'A response that is not HTML triggers no further requests, so it has no referrer to send: the OWASP REST Security Cheat Sheet recommends no-referrer. It only matters if this response is ever rendered as HTML and loads or links to something.',
+      verify: API_HTML_VERIFY,
+      sources: ['rest-rp', ...API_DEFENCE_SOURCES],
+    })];
+  }
+
+  function apiCorp(value, empty, ctx) {
+    const H = 'Cross-Origin-Resource-Policy';
+    if (value !== null) return checkCorp(value, ctx);
+    return [finding(H, Severity.LOW, apiTitle(H, empty), {
+      status: apiStatus(empty), brief: 'Any site can load the response',
+      description: "Without CORP, any site can load this endpoint with a tag such as <script> or <img>. If the browser sends the user's cookies with it, the response, with the user's data, enters that site's process: a response that parses as script can be read directly (Cross-Site Script Inclusion), any response is exposed to Spectre-style reads, and whether it loads tells the site whether the user is signed in. Cross-Origin-Resource-Policy: same-origin makes the browser drop the response first. Browsers that implement opaque response blocking already withhold a JSON, HTML or XML response from such a tag, when the Content-Type is right; CORP asks for the same protection explicitly, from every browser and for every type of response, as defence in depth.",
+      verify: 'Does this endpoint answer GET requests with user data, authenticated by cookies? If it does not (it only accepts POST, it authenticates with an Authorization header, or every cookie it relies on is set with SameSite=Lax or Strict), a tag on another site gets nothing of the user\'s and there is nothing here. If it does, this stands: set Cross-Origin-Resource-Policy: same-origin.',
+      sources: ['webdev-corp-api', 'webdev-corp-all', 'mdn-corp-xssi', 'mdn-corp-nocors', 'orb-blocklist', 'fetch-method-get', 'mdn-samesite-lax', 'mdn-samesite-default'],
+    })];
+  }
+
+  // Headers that act on a document only: an API response is not one.
+  const API_NOT_APPLICABLE = {
+    'cross-origin-opener-policy': ['COOP decides which windows a document shares its browsing context group with. An API response is not a window, so the header has no effect on it, sent or not.', ['cs-coop-api']],
+    'cross-origin-embedder-policy': ['COEP sets the policy a document applies when it loads cross-origin resources. An API response loads nothing, so the header has no effect on it, sent or not.', ['mdn-coep-doc']],
+    'origin-agent-cluster': ['Origin-Agent-Cluster asks for a document to be placed in an origin-keyed agent cluster. An API response is not a document, so the header has no effect on it, sent or not.', ['mdn-oac-doc']],
+    'x-dns-prefetch-control': ['DNS prefetching acts on the links and resources a document references. An API response references none, so the header has no effect on it, sent or not.', ['mdn-xdns-doc']],
+  };
+
+  function apiNotApplicable(key, canonical) {
+    const [description, sources] = API_NOT_APPLICABLE[key];
+    return () => [finding(canonical, Severity.OK, `${canonical}: not applicable to an API response`, { status: Status.NONE, description, sources })];
+  }
+
+  const API_CHECKERS = {
+    'content-security-policy': apiCsp,
+    'x-frame-options': apiXFrameOptions,
+    'content-type': apiContentType,
+    'permissions-policy': apiPermissionsPolicy,
+    'referrer-policy': apiReferrerPolicy,
+    'cross-origin-resource-policy': apiCorp,
+  };
 
   /** 63072000 -> "2-year"; anything not a whole number of years stays in seconds. */
   function duration(seconds) {
@@ -3715,12 +3989,17 @@ svg { fill: currentColor; }
    */
   function analyzeHeaders(headers, profile, context) {
     const results = [];
-    const notPage = notAPage(headers, context);
+    const mode = HL.profiles.getMode(context && context.mode ? context.mode.id : 'page');
+    const api = mode.id === 'api';
     const cspValues = headers.get('content-security-policy');
     const framingByCsp = !!cspValues && HL.csp.restrictsFraming(cspValues.join(', '));
 
     for (const [key, canonical, registryAbsent] of SECURITY_HEADERS) {
-      if (profile.skip.has(key)) continue;
+      if (!HL.profiles.inScope(key, profile, mode)) continue;
+      if (api && (API_CHECKERS[key] || API_NOT_APPLICABLE[key])) {
+        results.push(apiResult(key, canonical, headers.get(key), profile, framingByCsp));
+        continue;
+      }
       let absentSeverity = registryAbsent;
       // CSP frame-ancestors replaces X-Frame-Options in every browser that has
       // it (ASVS 3.4.6 asks for frame-ancestors). XFO is then only the fallback
@@ -3729,17 +4008,16 @@ svg { fill: currentColor; }
       if (xfoFallbackOnly) absentSeverity = Severity.LOW;
       // Browsers ignore an empty header, so empty and absent are the same state;
       // a value a browser cannot use weighs the same as well (ctx.absentSeverity).
-      const ctx = { absentSeverity: absentSeverity === null ? Severity.LOW : absentSeverity, hsts: profile.hsts };
+      const ctx = { absentSeverity: absentSeverity === null ? Severity.LOW : absentSeverity, hsts: profile.hsts, api };
 
       const occurrences = headers.get(key);
       const findings = [];
       let value = null;
 
-      const verify = MISSING_VERIFY[key] || (notPage && PAGE_ONLY.has(key) ? pageOnlyVerify(notPage, canonical) : '');
-      const pageOnly = notPage && PAGE_ONLY.has(key) && !MISSING_VERIFY[key];
+      const verify = MISSING_VERIFY[key] || '';
       const missingSources = [
         ...(xfoFallbackOnly ? ['csp3-fa-xfo', 'cs-xfo-fa', 'obs-xfo-csp'] : (MISSING_SOURCES[key] || [])),
-        ...(pageOnly ? PAGE_ONLY_SOURCES[key] : []),
+        ...(api && key === 'cache-control' ? ['rest-cc'] : []),
       ];
       // Pragma beside a missing Cache-Control usually means it was meant to do
       // Cache-Control's job, which in a response it was never defined to do.
@@ -3787,6 +4065,22 @@ svg { fill: currentColor; }
       }
     }
     return results;
+  }
+
+  /** One header in REST API mode: duplicates resolved as in page mode, then judged as an API response. */
+  function apiResult(key, canonical, occurrences, profile, framingByCsp) {
+    const findings = [];
+    let value = null;
+    if (occurrences) {
+      const resolved = resolveDuplicates(key, canonical, occurrences);
+      value = resolved.value;
+      if (resolved.note) findings.push(resolved.note);
+    }
+    const empty = value !== null && value.trim() === '';
+    const ctx = { absentSeverity: Severity.LOW, hsts: profile.hsts };
+    const check = API_CHECKERS[key] || apiNotApplicable(key, canonical);
+    findings.push(...check(empty || value === null ? null : value, empty, ctx, framingByCsp));
+    return { key, name: canonical, value, present: value !== null, findings };
   }
 
   const SEVERITY_BY_VALUE = Object.fromEntries(Object.values(Severity).map((v) => [v, true]));
@@ -3913,11 +4207,14 @@ svg { fill: currentColor; }
     const xfo = byKey.get(XFO);
     const csp = byKey.get(CSP);
     if (!xfo || !csp || !xfo.present) return [];
-    if (!csp.findings.some((f) => f.title === PERMISSIVE_FRAME_ANCESTORS)) return [];
+    // Web page mode grades the CSP's permissive frame-ancestors with PERMISSIVE_FRAME_ANCESTORS;
+    // REST API mode names the value it read.
+    const permissive = (f) => f.title === PERMISSIVE_FRAME_ANCESTORS || /^CSP: frame-ancestors .+ lets any site frame this response$/.test(f.title);
+    if (!csp.findings.some(permissive)) return [];
     return [[XFO, finding('X-Frame-Options', Severity.OK, 'X-Frame-Options: replaced by the CSP, which allows framing', {
       sources: ['csp3-fa-xfo', 'html-xfo-csp'],
       status: Status.NONE,
-      description: 'A browser that implements CSP frame-ancestors does not read this header at all: the directive\'s presence replaces it, whatever its value. Here it is permissive, so the page can be framed by anyone, and this header protects only browsers old enough to ignore CSP entirely. The exposure is graded on the Content-Security-Policy row; what is said here is that this one does not offset it.',
+      description: 'A browser that implements CSP frame-ancestors does not read this header at all: the directive\'s presence replaces it, whatever its value. Here it is permissive, so anyone can frame this response, and this header protects only browsers old enough to ignore CSP entirely. The exposure is graded on the Content-Security-Policy row; what is said here is that this one does not offset it.',
       recommendation: 'Restrict frame-ancestors, and keep this header for the browsers that do not implement it.',
     })]];
   }
@@ -4003,10 +4300,12 @@ svg { fill: currentColor; }
   /**
    * @param {string} text       raw response text
    * @param {string} profileId  'basic' | 'extended'
+   * @param {string} modeId     'page' | 'api': what the user says the response is
    */
-  function analyze(text, profileId) {
+  function analyze(text, profileId, modeId) {
     const profile = HL.profiles.getProfile(profileId);
-    const meta = { version: VERSION, profile: { id: profile.id, name: profile.name } };
+    const mode = HL.profiles.getMode(modeId);
+    const meta = { version: VERSION, profile: { id: profile.id, name: profile.name }, mode: { id: mode.id, name: mode.name } };
     try {
       if (typeof text !== 'string' || text.trim() === '') {
         return failure('empty', meta);
@@ -4019,7 +4318,7 @@ svg { fill: currentColor; }
       }
 
       const notes = [...parsed.notes, ...response.notes];
-      const results = HL.rules.analyzeHeaders(HL.parser.headerMap(response), profile, { status: response.status });
+      const results = HL.rules.analyzeHeaders(HL.parser.headerMap(response), profile, { status: response.status, mode });
       return Object.assign(meta, {
         ok: true,
         error: null,
@@ -4165,6 +4464,26 @@ svg { fill: currentColor; }
         '{"status":"ok"}',
       ]),
     },
+    {
+      // Loading it also selects REST API mode: the sample is an API response.
+      id: 'api',
+      name: 'REST API response',
+      detail: 'JSON with reflected CORS, no no-store',
+      mode: 'api',
+      text: join([
+        'HTTP/2 200',
+        'content-type: application/json',
+        'access-control-allow-origin: https://evil.example',
+        'access-control-allow-credentials: true',
+        'cache-control: private, max-age=300',
+        'strict-transport-security: max-age=31536000',
+        'x-content-type-options: nosniff',
+        'x-frame-options: SAMEORIGIN',
+        'vary: Origin',
+        '',
+        '{"accounts":[{"id":"A-1001","balance":"1234.56"}]}',
+      ]),
+    },
   ]);
 })(globalThis.HeaderAnalyzer = globalThis.HeaderAnalyzer || {});
 
@@ -4175,7 +4494,7 @@ svg { fill: currentColor; }
  * Rules this file keeps:
  *   - every piece of text that came from the input reaches the page through
  *     textContent or a text node, never through innerHTML;
- *   - the input is never persisted: only the profile and appearance choices;
+ *   - the input is never persisted: only the profile, mode and appearance choices;
  *   - a failure anywhere in rendering is caught and shown, never left as a
  *     blank pane.
  */
@@ -4242,6 +4561,7 @@ svg { fill: currentColor; }
 
   const state = {
     profile: HL.profiles.getProfile(storage.get('profile')).id,
+    mode: HL.profiles.getMode(storage.get('mode')).id,
     filter: 'all',
     query: '',
     report: null,
@@ -4311,6 +4631,31 @@ svg { fill: currentColor; }
     storage.set('profile', state.profile);
     applyProfile();
     runAnalysis(true);
+  }
+
+  // ------------------------------------------------------------------- mode
+  // What the response is: the user's choice, never guessed from the response.
+
+  const MODE_HINT = {
+    page: 'The response is a page a browser displays',
+    api: 'The response is a call to an API read by a browser (OWASP REST Security Cheat Sheet)',
+  };
+
+  function applyMode() {
+    for (const b of document.querySelectorAll('#mode-control [data-mode]')) {
+      const on = b.dataset.mode === state.mode;
+      b.setAttribute('aria-checked', String(on));
+      b.tabIndex = on ? 0 : -1;
+      b.title = MODE_HINT[b.dataset.mode];
+    }
+  }
+
+  function setMode(id, analyse = true) {
+    if (id === state.mode) return;
+    state.mode = HL.profiles.getMode(id).id;
+    storage.set('mode', state.mode);
+    applyMode();
+    if (analyse) runAnalysis(true);
   }
 
   function initSegmented(container, onSelect) {
@@ -4392,7 +4737,7 @@ svg { fill: currentColor; }
     if (!force && text === state.lastInput) return;
     state.lastInput = text;
 
-    const report = HL.engine.analyze(text, state.profile);
+    const report = HL.engine.analyze(text, state.profile, state.mode);
     state.report = report;
     render();
     if (report.ok) {
@@ -4440,7 +4785,7 @@ svg { fill: currentColor; }
     }
     if (!report.ok) return [errorState('Nothing to analyse', report.error)];
 
-    const nodes = [];
+    const nodes = [contextCard(report)];
     if (report.notes.length) nodes.push(notesCard(report.notes));
     nodes.push(filterBar(report));
     nodes.push(...listSections(report));
@@ -4483,6 +4828,16 @@ svg { fill: currentColor; }
       copyText(lines.map((l) => `- ${l.text}`).join('\n'), done);
     });
     return el('div', { className: 'menu-anchor copy-anchor' }, button, menu);
+  }
+
+  /** Which rules produced the report; in REST API mode, what the response is taken to be. */
+  function contextCard(report) {
+    const api = report.mode.id === 'api';
+    return el('div', { className: 'report-context' },
+      el('p', null,
+        el('strong', { text: `${report.profile.name} · ${report.mode.name}` }),
+        api ? ' · Evaluated as an API called from a browser.' : ''),
+      api ? sourcesNode(['rest-scope']) : null);
   }
 
   function notesCard(notes) {
@@ -4701,11 +5056,13 @@ svg { fill: currentColor; }
   function init() {
     applyTheme();
     applyProfile();
+    applyMode();
 
     const input = $('input');
     input.addEventListener('input', scheduleAnalysis);
 
     initSegmented($('profile-control'), (b) => setProfile(b.dataset.profile));
+    initSegmented($('mode-control'), (b) => setMode(b.dataset.mode));
 
     const samplesMenu = $('samples-menu');
     for (const s of HL.samples) {
@@ -4714,7 +5071,10 @@ svg { fill: currentColor; }
     }
     initMenu($('samples-button'), samplesMenu, (item) => {
       const s = HL.samples.find((x) => x.id === item.dataset.sample);
-      if (s) loadText(s.text);
+      if (s) {
+        if (s.mode) setMode(s.mode, false);
+        loadText(s.text);
+      }
     });
     $('theme-button').addEventListener('click', () => {
       storage.set('theme', currentTheme() === 'dark' ? 'light' : 'dark');

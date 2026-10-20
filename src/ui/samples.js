@@ -57,5 +57,25 @@
         '{"status":"ok"}',
       ]),
     },
+    {
+      // Loading it also selects REST API mode: the sample is an API response.
+      id: 'api',
+      name: 'REST API response',
+      detail: 'JSON with reflected CORS, no no-store',
+      mode: 'api',
+      text: join([
+        'HTTP/2 200',
+        'content-type: application/json',
+        'access-control-allow-origin: https://evil.example',
+        'access-control-allow-credentials: true',
+        'cache-control: private, max-age=300',
+        'strict-transport-security: max-age=31536000',
+        'x-content-type-options: nosniff',
+        'x-frame-options: SAMEORIGIN',
+        'vary: Origin',
+        '',
+        '{"accounts":[{"id":"A-1001","balance":"1234.56"}]}',
+      ]),
+    },
   ]);
 })(globalThis.HeaderAnalyzer = globalThis.HeaderAnalyzer || {});

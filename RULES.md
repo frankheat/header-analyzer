@@ -83,14 +83,35 @@ an HTML Content-Type.
 
 | | Basic | Extended |
 |---|:-:|:-:|
-| Headers checked | 18 | 25 |
+| Headers checked | 17 | 25 |
 | HSTS minimum max-age | 63072000 s ([2 years, OWASP][cs-hsts-rec]) | 63072000 s |
 | HSTS includeSubDomains required | yes | yes |
 | HSTS preload | not asked | LOW, to confirm |
 
-Extended adds Origin-Agent-Cluster, Service-Worker-Allowed, Content-Disposition,
-Pragma, Expires, ETag and X-Download-Options, and so also reports leftover
-legacy headers.
+Extended adds Clear-Site-Data, Origin-Agent-Cluster, Service-Worker-Allowed,
+Content-Disposition, Pragma, Expires, ETag and X-Download-Options, and so also
+reports leftover legacy headers.
+
+*Deviation:* Clear-Site-Data is checked in Extended only. The OWASP Secure
+Headers Project says to [set it to the logout function][bp-csd-logout], and
+[ASVS 14.3.1][asvs-14.3.1] and the [Session Management Cheat Sheet][session-csd]
+ask for it when a session ends. It belongs on that one response, not on every
+response, so in Basic it would ask the same question of almost every response
+analysed, nearly always to answer no. The same holds in both modes.
+
+### Modes: Web page or REST API
+
+A second, independent choice says what the response is. It is always the
+user's: nothing in the response (its Content-Type, its status) is used to
+guess it.
+
+- **Web page.** The response is a page a browser displays. Every rule in the
+  sections below applies, and no check asks whether it is a page.
+- **REST API.** The response is a call to an API read by a browser, judged on
+  the [OWASP REST Security Cheat Sheet][rest-scope]. With Basic, only the
+  headers of that cheat sheet are checked; with Extended, the same 25 headers
+  as in Web page mode, each with the criterion for an API response. See
+  [REST API mode](#rest-api-mode).
 
 ---
 
@@ -176,20 +197,6 @@ selected, to copy by hand.
 | Access-Control-Allow-Origin, Access-Control-Allow-Credentials | OK | No CORS headers: [the CORS check fails][fetch-cors-null], same-origin only |
 
 An **empty** value is graded as the header's absence: browsers ignore it.
-
-**Responses that are not pages.** The OWASP Cheat Sheet notes that
-X-Frame-Options [does not provide any security][cs-xfo-api] on a redirect or a
-JSON API, that CSP [might be meaningless][cs-csp-api] on a REST API response
-that is not rendered, and that COOP [may not make sense][cs-coop-api] for REST
-APIs. So when the response is evidently not a page (a Content-Type other than
-HTML, XHTML, SVG or XML, or a 3xx redirect other than 304), a missing CSP,
-X-Frame-Options or COOP keeps its severity but becomes **to confirm**. The check
-is to open the URL in a browser tab, also with a wrong parameter so that an
-error page shows up if there is one. Only data or a redirect: nothing to report
-on this response; when the data ends up inside a page, it is that page's
-response that needs the header, and the one to analyse. A web page: the finding
-stands. With an HTML Content-Type, or none at all, nothing changes. The type is read as [Fetch extracts it][fetch-mime],
-the same way the Content-Type check reads it.
 
 ### Duplicate headers
 
@@ -368,7 +375,7 @@ a cookie or by an Authorization header ([RFC 9111 §3.5][rfc9111-auth])?
 | `private` ([shared caches must not store it][rfc9111-private], [private ones still may][cs-cc-private]), `no-cache` ([does not prevent caching][cs-cc-nocache]), `max-age=0` with must-/proxy-revalidate, no directive a cache understands ([heuristic caching][rfc9111-heuristic], [OWASP: do not rely on defaults][cs-cc-default]) | LOW, to confirm |
 | Storable by shared caches (`max-age`, `s-maxage`, `public`, qualified `private=`/`no-cache=`) | **MEDIUM**, to confirm: grants more than the default; impact high (one user's data served to another) × likelihood low. [public, s-maxage and must-revalidate][rfc9111-auth-directives] even reopen shared caching of Authorization requests |
 
-## Clear-Site-Data
+## Clear-Site-Data (Extended)
 
 Absent: **LOW**, to confirm (does this response end a session?
 [Logout, account deletion][csd-logout]). Values are [quoted strings][csd-grammar]
@@ -396,13 +403,10 @@ Absent: **LOW**.
 Absent: **LOW**, to confirm, in both profiles. The header is [not
 standard][cs-xdns-nonstd] ([MDN][mdn-xdns-nonstd]).
 
-The check first asks whether the response is a web page: prefetching acts on
-[links and items referenced by the document][mdn-xdns-doc], so on data (JSON, a
-file) or a redirect there is nothing here, and the page that shows the data is
-the one to check. On a page, the finding stands when the page shows any of the
-OWASP conditions: [links to sites you do not control][cs-xdns], [sensitive or
-personal data][bp-xdns-pii], or input from users, which is what makes it
-[prone to HTML injection][bp-xdns-inj].
+The check asks whether the page shows any of the OWASP conditions: [links to
+sites you do not control][cs-xdns], [sensitive or personal data][bp-xdns-pii],
+or input from users, which is what makes it [prone to HTML
+injection][bp-xdns-inj]. Any of them: the finding stands. None: nothing here.
 
 | Condition | Severity |
 |---|---|
@@ -496,6 +500,107 @@ tracking][rfc9110-etag-privacy]).
 
 ---
 
+## REST API mode
+
+The response is a call to an API read by a browser. The cheat sheet's table is
+for exactly that: headers that ["should be included in all API responses that
+may be consumed by browser clients"][rest-scope]. The report says so above the
+results. Headers are read, and duplicates resolved, as in Web page mode; what
+changes is the criterion.
+
+### Every API response (Basic and Extended)
+
+| Header | Expected | Missing or wrong | Why |
+|---|---|---|---|
+| Content-Security-Policy | `frame-ancestors 'none'` | **LOW** | [An API response never needs to be framed][rest-fa]; it [protects against drag-and-drop clickjacking][rest-fa-dnd]; [ASVS 3.4.6][asvs-3.4.6]. *Deviation:* in Web page mode missing anti-framing is MEDIUM. Here the attack needs an endpoint answering GET, cookies a cross-site frame still sends, and the user dragging data out, so it is graded LOW. A `frame-ancestors` naming sites is LOW too |
+| Content-Type | the type of the body | **LOW** | [Must be specified as per the content returned][rest-ct], or [a browser might guess it][rest-ct-guess]; [ASVS 4.1.1][asvs-4.1.1]. An invalid value is LOW as well. No charset is asked of `application/json`: ASVS 4.1.1 asks for it on text and XML types |
+| Content-Type `text/html` | | LOW, to confirm | Is the body really HTML? If not, this stands |
+| Content-Type of a [JavaScript MIME type][mimesniff-js] | | LOW, to confirm | The cheat sheet: [application/json and not application/javascript][rest-ct-js]. Another site can run it with `<script src>` ([Cross-Site Script Inclusion][mdn-corp-xssi]). Is the body really JavaScript? If not, this stands |
+| Cache-Control | `no-store` | as in Web page mode: a check on whether the response carries a signed-in user's data | The cheat sheet asks for no-store, [not stored by private or shared caches][rest-cc], on every API response. *Deviation:* the tool asks for it where the response carries a user's data, as in Web page mode, because a cached public response exposes no one |
+| Strict-Transport-Security | as in Web page mode | as in Web page mode | Same rules, same severities |
+| X-Content-Type-Options | `nosniff` | as in Web page mode | Same rules |
+| X-Frame-Options | `DENY` | **LOW** | [Still recommended for browsers without CSP Level 2][rest-xfo]. `SAMEORIGIN` is LOW: [no API response needs framing][rest-fa]. *Deviation:* the OWASP HTTP Headers Cheat Sheet says it [does not provide any security][cs-xfo-api] on a JSON API; the REST Security Cheat Sheet, the reference for this mode, still recommends it. Next to a `frame-ancestors` that lets any site frame the response, a note says browsers [ignore this header][csp3-fa-xfo], as in Web page mode |
+
+In this mode the CSP is read for two directives only: `frame-ancestors` (above)
+and `default-src` (below). [Most of what a CSP does only affects pages rendered
+as HTML][rest-csp-dd], and the OWASP HTTP Headers Cheat Sheet notes that a CSP
+[might be meaningless][cs-csp-api] on a response that is not rendered, so the
+script, style and other directive checks of Web page mode are not run.
+
+### Defence in depth (Basic and Extended)
+
+These headers are [only intended to provide additional security when responses
+are rendered as HTML][rest-dd], and are recommended [if there is any
+uncertainty about the types of information the API returns][rest-dd-uncertain].
+Missing or wrong, each is **LOW, to confirm**, with the same check: can this API
+return HTML, now or in a later version? Never: nothing here. It can, or you
+cannot be sure: the finding stands.
+
+| Header | Expected | Why |
+|---|---|---|
+| Content-Security-Policy | `default-src 'none'` | [Most CSP functionality only affects pages rendered as HTML][rest-csp-dd] |
+| Permissions-Policy | every feature it names closed with `()`, as in the cheat sheet's example; it need not name them all | [Controls browser features][rest-pp]. A feature it allows (`self`, `*`, an origin) is LOW, to confirm, and the title names it |
+| Referrer-Policy | `no-referrer` | [Non-HTML responses should not trigger additional requests][rest-rp] |
+
+CORS headers keep their Web page rules; the cheat sheet asks to [be as specific
+as possible][rest-cors] with allowed origins.
+
+### Other headers (Extended only)
+
+| Header | In REST API mode | Why |
+|---|---|---|
+| Cross-Origin-Opener-Policy | OK, not applicable | Acts on windows; OWASP: [may not make sense for REST APIs][cs-coop-api] |
+| Cross-Origin-Embedder-Policy | OK, not applicable | [A document's policy for loading cross-origin resources][mdn-coep-doc] |
+| Origin-Agent-Cluster | OK, not applicable | [Places a Document in an origin-keyed agent cluster][mdn-oac-doc] |
+| X-DNS-Prefetch-Control | OK, not applicable | Prefetching acts on [links and items referenced by the document][mdn-xdns-doc] |
+| Cross-Origin-Resource-Policy | missing: **LOW, to confirm** (see below); present: as in Web page mode | [Recommended for API responses called only from the same origin][webdev-corp-api] |
+| X-XSS-Protection | as in Web page mode: `1` is LOW, deprecated | The filter [stopped pages from loading][mdn-xxp-pages]; an API response is not rendered, so the description says the risk is gone and an obsolete header is what is left |
+| Every other header | as in Web page mode | Clear-Site-Data stays a check: a logout is often an API call. The REST Security Cheat Sheet does not name it because [stateful services are out of its scope][rest-stateless]; [ASVS 14.3.1][asvs-14.3.1] and the [Session Management Cheat Sheet][session-csd] ask for it when a session ends, API or page |
+
+### Cross-Origin-Resource-Policy on an API
+
+CORP acts when another site loads a resource [in no-cors mode][mdn-corp-nocors],
+with a tag such as `<script>` or `<img>`. With `same-origin` the browser drops
+the response before the other site's page gets it. It mitigates [Spectre-style
+attacks and Cross-Site Script Inclusion][mdn-corp-xssi]. On an API with a
+signed-in user's data, three attacks are possible without it:
+
+- **Reading the data through `<script>`.** An endpoint that returns JavaScript
+  with the user's data (a configuration file, an old JSONP API) is included by
+  another site with `<script src>`; the browser runs it in that site's page,
+  which reads the data. The browser's own blocking of opaque JSON responses does
+  not apply here, because the response is valid JavaScript.
+- **Reading memory with Spectre.** `<img src>` pointed at a JSON endpoint pulls
+  the response into the other site's process, where a Spectre attack can read
+  it. CORP keeps it out.
+- **Telling whether the user is signed in.** `<script src>` on an endpoint that
+  answers 200 when signed in and 401 otherwise fires `onload` or `onerror`;
+  CORP makes it fail every time.
+
+None of this works unless the tag's request is answered with the user's data:
+
+- a tag's request uses [GET][fetch-method-get], so an endpoint that only
+  accepts POST cannot be reached this way;
+- an `Authorization` header is never added to it, so an API authenticated that
+  way answers as for an anonymous user;
+- a cookie set with `SameSite=Lax` or `Strict` is [not sent on a cross-site
+  subresource request][mdn-samesite-lax]. Without the attribute, [some browsers
+  apply Lax by default][mdn-samesite-default] and others send the cookie.
+
+Browsers that implement opaque response blocking already withhold a response
+whose type is [HTML, JSON or XML][orb-blocklist] from such a tag, when its
+Content-Type is right: the REST Security Cheat Sheet's own rules (the [right
+Content-Type][rest-ct-js], `nosniff`) make that work. That protection is a browser feature, though,
+not something the API asks for: it depends on the browser or WebView at the
+other end, and it does not cover other types (a file, an image). CORP asks for
+it explicitly, from every browser and for every type, and [all resources are
+recommended to send it][webdev-corp-all]. The tool keeps it as defence in depth.
+
+Hence the check: does this endpoint answer GET requests with user data,
+authenticated by cookies? If it does, the finding stands.
+
+---
+
 ## Citations
 
 Every passage the app and this file cite, in full. Each link opens the source
@@ -517,6 +622,7 @@ with the passage highlighted.
 - `asvs-3.4.6`: [OWASP ASVS 5.0, V3 Web Frontend Security][asvs-3.4.6]: “Verify that the web application uses the frame-ancestors directive of the Content-Security-Policy header field for every HTTP response”
 - `asvs-3.4.6-xfo`: [OWASP ASVS 5.0, V3 Web Frontend Security][asvs-3.4.6-xfo]: “Note that the X-Frame-Options header field, although supported by browsers, is obsolete and may not be relied upon.”
 - `asvs-3.4.8`: [OWASP ASVS 5.0, V3 Web Frontend Security][asvs-3.4.8]: “include the Cross‑Origin‑Opener‑Policy header field with the same-origin directive or the same-origin-allow-popups directive as required”
+- `asvs-4.1.1`: [OWASP ASVS 5.0, V4 API and Web Service][asvs-4.1.1]: “Verify that every HTTP response with a message body contains a Content-Type header field that matches the actual content of the response”
 - `attribution-default`: [Attribution Reporting API][attribution-default]: “This specification defines a policy-controlled feature identified by the string "attribution-reporting". Its default allowlist is *.”
 - `bp-cache`: [OWASP Secure Headers Project, Best Practices][bp-cache]: “So, the browser will store a copy of the file (here a PDF one) into its cache storage for a certain amount of time.”
 - `bp-cc`: [OWASP Secure Headers Project, Best Practices][bp-cc]: “no-store, max-age=0”
@@ -621,6 +727,7 @@ with the passage highlighted.
 - `fetch-cors-origin`: [WHATWG Fetch Standard][fetch-cors-origin]: “If the result of byte-serializing a request origin with request is not origin, then return failure.”
 - `fetch-cors-star`: [WHATWG Fetch Standard][fetch-cors-star]: “If request’s credentials mode is not "include" and origin is `*`, then return success.”
 - `fetch-get`: [WHATWG Fetch Standard][fetch-get]: “Return the values of all headers in list whose name is a byte-case-insensitive match for name, separated from each other by 0x2C 0x20, in order.”
+- `fetch-method-get`: [WHATWG Fetch Standard][fetch-method-get]: “A request has an associated method. Unless stated otherwise it is GET.”
 - `fetch-mime`: [WHATWG Fetch Standard][fetch-mime]: “To extract a MIME type from a header list headers, run these steps. They return failure or a MIME type.”
 - `fetch-nosniff`: [WHATWG Fetch Standard][fetch-nosniff]: “If values[0] is an ASCII case-insensitive match for "nosniff", then return true.”
 - `geolocation-default`: [W3C Geolocation][geolocation-default]: “This specification defines a policy-controlled feature identified by the token string "geolocation". Its default allowlist is 'self'.”
@@ -642,22 +749,30 @@ with the passage highlighted.
 - `ie8-xdo`: [Microsoft, IE8 Security Part V: Comprehensive Protection][ie8-xdo]: “When the new X-Download-Options header is present with the value noopen, the user is prevented from opening a file download directly”
 - `mdn-acao-null`: [MDN, Access-Control-Allow-Origin][mdn-acao-null]: “Note: The value null should not be used.”
 - `mdn-bamc`: [MDN, CSP block-all-mixed-content][mdn-bamc]: “Warning: This directive is marked as obsolete in the specification.”
+- `mdn-coep-doc`: [MDN, Cross-Origin-Embedder-Policy][mdn-coep-doc]: “configures the current document's policy for loading and embedding cross-origin resources”
+- `mdn-corp-nocors`: [MDN, Cross-Origin Resource Policy (CORP)][mdn-corp-nocors]: “The policy is only effective for no-cors requests”
+- `mdn-corp-xssi`: [MDN, Cross-Origin Resource Policy (CORP)][mdn-corp-xssi]: “to mitigate speculative side-channel attacks, like Spectre, as well as Cross-Site Script Inclusion attacks”
 - `mdn-docdomain-oac`: [MDN, Document.domain][mdn-docdomain-oac]: “If used on an origin-isolated page, i.e., one that uses the Origin-Agent-Cluster HTTP header”
 - `mdn-docdomain-shared`: [MDN, Document.domain][mdn-docdomain-shared]: “Similar problems occur with shared hosting sites that give each customer a different subdomain.”
 - `mdn-expectct`: [MDN, Expect-CT][mdn-expectct]: “Only Google Chrome and other Chromium-based browsers implemented Expect-CT, and Chromium has deprecated the header from version 107, because Chromium now enforces CT by default.”
+- `mdn-oac-doc`: [MDN, Origin-Agent-Cluster][mdn-oac-doc]: “is used to request that the associated Document should be placed in an origin-keyed agent cluster”
 - `mdn-oac-hint`: [MDN, Origin-Agent-Cluster][mdn-oac-hint]: “Origin-keyed agent clusters should not be viewed as a security feature”
 - `mdn-oac-ignored`: [MDN, Origin-Agent-Cluster][mdn-oac-ignored]: “Values other than ?1 are ignored (e.g., the ?0 structured field for false).”
 - `mdn-object-src`: [MDN, CSP object-src][mdn-object-src]: “Therefore it is recommended to restrict this fetch-directive”
 - `mdn-pragma`: [MDN, Pragma][mdn-pragma]: “The Pragma header is not specified for HTTP responses and is therefore not a reliable replacement for the HTTP/1.1 Cache-Control header”
 - `mdn-prefetch`: [MDN, CSP prefetch-src][mdn-prefetch]: “Non-standard: This feature is not standardized.”
+- `mdn-samesite-default`: [MDN, Set-Cookie][mdn-samesite-default]: “Some browsers use Lax as the default value if SameSite is not specified”
+- `mdn-samesite-lax`: [MDN, Set-Cookie][mdn-samesite-lax]: “Lax: send the cookie for same-site requests, and for cross-site requests only on a top-level navigation with a safe method”
 - `mdn-xdns-doc`: [MDN, X-DNS-Prefetch-Control][mdn-xdns-doc]: “links that the user may choose to follow as well as URLs for items referenced by the document”
 - `mdn-xdns-nonstd`: [MDN, X-DNS-Prefetch-Control][mdn-xdns-nonstd]: “Non-standard: This feature is not standardized.”
 - `mdn-xpcdp`: [MDN, X-Permitted-Cross-Domain-Policies][mdn-xpcdp]: “Some security testing tools will still check for the presence of a X-Permitted-Cross-Domain-Policies: none header because it can mitigate the risk of an overly-permissive policy file added to your site by accident or through malicious actions.”
 - `mdn-xpcdp-none`: [MDN, X-Permitted-Cross-Domain-Policies][mdn-xpcdp-none]: “No policy files are allowed anywhere on the target server, including in a master policy file.”
 - `mdn-xpcdp-ntr`: [MDN, X-Permitted-Cross-Domain-Policies][mdn-xpcdp-ntr]: “Indicates that the current document should not be used as a policy file despite other headers or its content.”
 - `mdn-xxp-block`: [MDN, X-XSS-Protection][mdn-xxp-block]: “though this approach might be vulnerable to side-channel attacks if the website is embeddable in an”
+- `mdn-xxp-pages`: [MDN, X-XSS-Protection][mdn-xxp-pages]: “stopped pages from loading when they detected reflected cross-site scripting”
 - `mdn-xxp-warn`: [MDN, X-XSS-Protection][mdn-xxp-warn]: “in some cases, X-XSS-Protection can create XSS vulnerabilities in otherwise safe websites”
 - `mediacapture-default`: [W3C Media Capture and Streams][mediacapture-default]: “This specification defines two policy-controlled features identified by the strings "camera" and "microphone". Both have a default allowlist of "self".”
+- `mimesniff-js`: [WHATWG MIME Sniffing Standard][mimesniff-js]: “A JavaScript MIME type is any MIME type whose essence is one of the following”
 - `mimesniff-type`: [WHATWG MIME Sniffing Standard][mimesniff-type]: “If type is the empty string or does not solely contain HTTP token code points, then return failure.”
 - `mixed-script`: [W3C Mixed Content][mixed-script]: “A request for the script http://example.com/script.js is mixed content. As script requests are blockable, the user agent will return a network error rather than loading the resource.”
 - `obs-coop-absent`: [Mozilla HTTP Observatory, score table][obs-coop-absent]: “CoopNotImplemented, modifier: 0”
@@ -673,6 +788,7 @@ with the passage highlighted.
 - `obs-xcto-absent`: [Mozilla HTTP Observatory, score table][obs-xcto-absent]: “XContentTypeOptionsNotImplemented, modifier: -5”
 - `obs-xfo-absent`: [Mozilla HTTP Observatory, score table][obs-xfo-absent]: “XFrameOptionsNotImplemented, modifier: -20”
 - `obs-xfo-csp`: [Mozilla HTTP Observatory, score table][obs-xfo-csp]: “XFrameOptionsImplementedViaCsp, modifier: 5”
+- `orb-blocklist`: [Opaque Response Blocking (ORB) explainer, WHATWG Fetch][orb-blocklist]: “An opaque-blocklisted MIME type is an HTML MIME type, JSON MIME type, or XML MIME type.”
 - `owasp-rr-critical`: [OWASP Risk Rating Methodology][owasp-rr-critical]: “Overall Risk Severity: Critical only where impact is HIGH and likelihood is HIGH”
 - `permissions-delegation`: [W3C Permissions][permissions-delegation]: “Most powerful features grant permission to the top-level origin and delegate access to the requesting document via Permissions Policy. This is known as permission delegation.”
 - `pp-default`: [W3C Permissions Policy][pp-default]: “Every policy-controlled feature has a default allowlist.”
@@ -685,6 +801,21 @@ with the passage highlighted.
 - `ps-hsts`: [PortSwigger, Strict transport security not enforced][ps-hsts]: “Typical severity: Low”
 - `ps-referer`: [PortSwigger, Cross-domain Referer leakage][ps-referer]: “Typical severity: Information”
 - `referrer-last`: [W3C Referrer Policy][referrer-last]: “For each token in policy-tokens, if token is a referrer policy and token is not the empty string, then set policy to token.”
+- `rest-cc`: [OWASP REST Security Cheat Sheet][rest-cc]: “Instructs compliant private and shared HTTP caches not to store the response or reuse it for another request”
+- `rest-cors`: [OWASP REST Security Cheat Sheet][rest-cors]: “Be as specific as possible and as general as necessary when setting the origins of cross-domain calls.”
+- `rest-csp-dd`: [OWASP REST Security Cheat Sheet][rest-csp-dd]: “The majority of CSP functionality only affects pages rendered as HTML.”
+- `rest-ct`: [OWASP REST Security Cheat Sheet][rest-ct]: “This must be specified as per the type of content returned by an API call.”
+- `rest-ct-guess`: [OWASP REST Security Cheat Sheet][rest-ct-guess]: “If not specified or if specified incorrectly, a browser might attempt to guess the content type of the response.”
+- `rest-ct-js`: [OWASP REST Security Cheat Sheet][rest-ct-js]: “Ensure sending intended content type headers in your response matching your body content e.g. application/json and not application/javascript.”
+- `rest-dd`: [OWASP REST Security Cheat Sheet][rest-dd]: “The headers below are only intended to provide additional security when responses are rendered as HTML.”
+- `rest-dd-uncertain`: [OWASP REST Security Cheat Sheet][rest-dd-uncertain]: “if there is any uncertainty about the function of the headers, or the types of information that the API returns (or may return in future), then it is recommended to include them as part of a defense-in-depth approach”
+- `rest-fa`: [OWASP REST Security Cheat Sheet][rest-fa]: “For an API response, there is no requirement to be framed in any of those elements.”
+- `rest-fa-dnd`: [OWASP REST Security Cheat Sheet][rest-fa-dnd]: “This header protects against drag-and-drop style clickjacking attacks.”
+- `rest-pp`: [OWASP REST Security Cheat Sheet][rest-pp]: “When browsers heed this header, it is used to control browser features via directives.”
+- `rest-rp`: [OWASP REST Security Cheat Sheet][rest-rp]: “Non-HTML responses should not trigger additional requests.”
+- `rest-scope`: [OWASP REST Security Cheat Sheet][rest-scope]: “The following headers should be included in all API responses that may be consumed by browser clients”
+- `rest-stateless`: [OWASP REST Security Cheat Sheet][rest-stateless]: “Stateful services are out of scope of this Cheat Sheet”
+- `rest-xfo`: [OWASP REST Security Cheat Sheet][rest-xfo]: “Still recommended for compatibility with older browsers that do not support CSP Level 2.”
 - `rfc6266-unknown`: [RFC 6266, Content-Disposition][rfc6266-unknown]: “Unknown or unhandled disposition types SHOULD be handled by recipients the same way as "attachment"”
 - `rfc6797-first`: [RFC 6797, HTTP Strict Transport Security][rfc6797-first]: “If a UA receives more than one STS header field in an HTTP response message over secure transport, then the UA MUST process only the first such header field.”
 - `rfc6797-invalid`: [RFC 6797, HTTP Strict Transport Security][rfc6797-invalid]: “The UA MUST ignore any STS header fields not conforming to the grammar specified in Section 6.1 ("Strict-Transport-Security HTTP Response Header Field").”
@@ -702,11 +833,14 @@ with the passage highlighted.
 - `rfc9112-fold`: [RFC 9112, HTTP/1.1][rfc9112-fold]: “This specification deprecates such line folding except within the "message/http" media type”
 - `rfc9112-ws`: [RFC 9112, HTTP/1.1][rfc9112-ws]: “No whitespace is allowed between the field name and colon.”
 - `rfc9651-fail`: [RFC 9651, Structured Field Values][rfc9651-fail]: “When parsing fails, the entire field is ignored”
+- `session-csd`: [OWASP Session Management Cheat Sheet][session-csd]: “This can be achieved by returning the Clear-Site-Data response header”
 - `shp-deprecated`: [OWASP Secure Headers Project, Headers][shp-deprecated]: “Deprecated: Feature-Policy, Expect-CT, Public-Key-Pins, X-XSS-Protection, Pragma”
 - `sonar-detect`: [Sonar, Encoding Differentials: Why Charset Matters][sonar-detect]: “A single occurrence of one of these escape sequences is usually enough to convince the auto-detection algorithm that the HTTP response body is encoded with ISO-2022-JP.”
 - `strictcsp-fallback`: [web.dev, Mitigate XSS with a strict CSP][strictcsp-fallback]: “Setting fallbacks doesn't reduce the security of your policy in modern browsers”
 - `strictcsp-https`: [web.dev, Mitigate XSS with a strict CSP][strictcsp-https]: “All browsers that support strict-dynamic ignore the https: fallback, so this won't reduce the strength of the policy.”
 - `sw-allowed`: [W3C Service Workers][sw-allowed]: “Servers can remove the path restriction by setting a Service-Worker-Allowed header on the service worker script.”
+- `webdev-corp-all`: [web.dev, Security headers quick reference][webdev-corp-all]: “All resources are recommended to send this header to indicate whether they allow being loaded by other websites.”
+- `webdev-corp-api`: [web.dev, Security headers quick reference][webdev-corp-api]: “You should apply this to resources that include sensitive information about the user, or responses of an API that is intended to be called only from the same origin.”
 - `zap-10015`: [OWASP ZAP alert 10015, Re-examine Cache-control Directives][zap-10015]: “Risk: Informational”
 - `zap-10020-1`: [OWASP ZAP alert 10020-1, Missing Anti-clickjacking Header][zap-10020-1]: “Risk: Medium”
 - `zap-10020-4`: [OWASP ZAP alert 10020-4, X-Frame-Options Setting Malformed][zap-10020-4]: “Risk: Medium”
@@ -746,6 +880,7 @@ with the passage highlighted.
 [asvs-3.4.6]: https://github.com/OWASP/ASVS/blob/master/5.0/en/0x12-V3-Web-Frontend-Security.md#:~:text=Verify%20that%20the%20web%20application%20uses%20the%20frame%2Dancestors%20directive%20of%20the%20Content%2DSecurity%2DPolicy%20header%20field%20for%20every%20HTTP%20response
 [asvs-3.4.6-xfo]: https://github.com/OWASP/ASVS/blob/master/5.0/en/0x12-V3-Web-Frontend-Security.md#:~:text=Note%20that%20the%20X%2DFrame%2DOptions%20header%20field%2C%20although%20supported%20by%20browsers%2C%20is%20obsolete%20and%20may%20not%20be%20relied%20upon.
 [asvs-3.4.8]: https://github.com/OWASP/ASVS/blob/master/5.0/en/0x12-V3-Web-Frontend-Security.md#:~:text=include%20the%20Cross%E2%80%91Origin%E2%80%91Opener%E2%80%91Policy%20header%20field%20with%20the%20same%2Dorigin%20directive%20or%20the%20same%2Dorigin%2Dallow%2Dpopups%20directive%20as%20required
+[asvs-4.1.1]: https://github.com/OWASP/ASVS/blob/master/5.0/en/0x13-V4-API-and-Web-Service.md#:~:text=Verify%20that%20every%20HTTP%20response%20with%20a%20message%20body%20contains%20a%20Content%2DType%20header%20field,that%20matches%20the%20actual%20content%20of%20the%20response
 [attribution-default]: https://wicg.github.io/attribution-reporting-api/#:~:text=This%20specification%20defines%20a%20policy%2Dcontrolled%20feature%20identified%20by%20the%20string%20%22attribution%2Dreporting%22.%20Its%20default%20allowlist%20is%20*.
 [bp-cache]: https://github.com/OWASP/www-project-secure-headers/blob/master/mainsite/03_best_practices.md#:~:text=So%2C%20the%20browser%20will%20store,a%20certain%20amount%20of%20time.
 [bp-cc]: https://github.com/OWASP/www-project-secure-headers/blob/master/mainsite/03_best_practices.md#:~:text=no%2Dstore%2C%20max%2Dage%3D0
@@ -850,6 +985,7 @@ with the passage highlighted.
 [fetch-cors-origin]: https://fetch.spec.whatwg.org/#:~:text=If%20the%20result%20of%20byte%2Dserializing%20a%20request%20origin%20with%20request%20is%20not%20origin%2C%20then%20return%20failure.
 [fetch-cors-star]: https://fetch.spec.whatwg.org/#:~:text=If%20request%E2%80%99s%20credentials%20mode%20is%20not%20%22include%22%20and%20origin%20is%20%60*%60%2C%20then%20return%20success.
 [fetch-get]: https://fetch.spec.whatwg.org/#:~:text=Return%20the%20values%20of%20all,by%200x2C%200x20%2C%20in%20order.
+[fetch-method-get]: https://fetch.spec.whatwg.org/#:~:text=A%20request%20has%20an%20associated%20method,GET
 [fetch-mime]: https://fetch.spec.whatwg.org/#:~:text=To%20extract%20a%20MIME%20type%20from%20a%20header%20list%20headers%2C%20run%20these%20steps.%20They%20return%20failure%20or%20a%20MIME%20type.
 [fetch-nosniff]: https://fetch.spec.whatwg.org/#:~:text=If%20values%5B0%5D%20is%20an%20ASCII%20case%2Dinsensitive%20match%20for%20%22nosniff%22%2C%20then%20return%20true.
 [geolocation-default]: https://www.w3.org/TR/geolocation/#:~:text=This%20specification%20defines%20a%20policy%2Dcontrolled%20feature%20identified%20by%20the%20token%20string%20%22geolocation%22.%20Its%20default%20allowlist%20is%20'self'.
@@ -871,22 +1007,30 @@ with the passage highlighted.
 [ie8-xdo]: https://learn.microsoft.com/en-us/archive/blogs/ie/ie8-security-part-v-comprehensive-protection#:~:text=When%20the%20new%20X%2DDownload%2DOptions%20header,opening%20a%20file%20download%20directly
 [mdn-acao-null]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Access-Control-Allow-Origin#:~:text=Note%3A%20The%20value%20null%20should%20not%20be%20used.
 [mdn-bamc]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/block-all-mixed-content#:~:text=Warning%3A%20This%20directive%20is%20marked%20as%20obsolete%20in%20the%20specification.
+[mdn-coep-doc]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cross-Origin-Embedder-Policy#:~:text=configures%20the%20current%20document's%20policy%20for%20loading%20and%20embedding%20cross%2Dorigin%20resources
+[mdn-corp-nocors]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cross-Origin_Resource_Policy#:~:text=The%20policy%20is%20only%20effective%20for%20no%2Dcors%20requests
+[mdn-corp-xssi]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cross-Origin_Resource_Policy#:~:text=to%20mitigate%20speculative%20side%2Dchannel%20attacks%2C%20like%20Spectre%2C%20as%20well%20as%20Cross%2DSite%20Script%20Inclusion%20attacks
 [mdn-docdomain-oac]: https://developer.mozilla.org/en-US/docs/Web/API/Document/domain#:~:text=If%20used%20on%20an%20origin%2Disolated%20page%2C%20i.e.%2C%20one%20that%20uses%20the%20Origin%2DAgent%2DCluster%20HTTP%20header
 [mdn-docdomain-shared]: https://developer.mozilla.org/en-US/docs/Web/API/Document/domain#:~:text=Similar%20problems%20occur%20with%20shared%20hosting%20sites%20that%20give%20each%20customer%20a%20different%20subdomain.
 [mdn-expectct]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Expect-CT#:~:text=Only%20Google%20Chrome%20and%20other,now%20enforces%20CT%20by%20default.
+[mdn-oac-doc]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Origin-Agent-Cluster#:~:text=is%20used%20to%20request%20that%20the%20associated%20Document%20should%20be%20placed%20in%20an%20origin%2Dkeyed%20agent%20cluster
 [mdn-oac-hint]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Origin-Agent-Cluster#:~:text=Origin%2Dkeyed%20agent%20clusters%20should%20not%20be%20viewed%20as%20a%20security%20feature
 [mdn-oac-ignored]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Origin-Agent-Cluster#:~:text=Values%20other%20than%20%3F1%20are%20ignored%20(e.g.%2C%20the%20%3F0%20structured%20field%20for%20false).
 [mdn-object-src]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/object-src#:~:text=Therefore%20it%20is%20recommended%20to%20restrict%20this%20fetch%2Ddirective
 [mdn-pragma]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Pragma#:~:text=The%20Pragma%20header%20is%20not,for%20the%20HTTP%2F1.1%20Cache%2DControl%20header
 [mdn-prefetch]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/prefetch-src#:~:text=Non%2Dstandard%3A%20This%20feature%20is%20not%20standardized.
+[mdn-samesite-default]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie#:~:text=Some%20browsers%20use%20Lax%20as%20the%20default%20value%20if%20SameSite%20is%20not%20specified
+[mdn-samesite-lax]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie#:~:text=and%20for%20cross%2Dsite%20requests%20that%20meet%20both%20of%20the%20following%20criteria,The%20request%20uses%20a%20safe%20method
 [mdn-xdns-doc]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-DNS-Prefetch-Control#:~:text=links%20that%20the%20user%20may%20choose%20to%20follow%20as%20well%20as%20URLs%20for%20items%20referenced%20by%20the%20document
 [mdn-xdns-nonstd]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-DNS-Prefetch-Control#:~:text=Non%2Dstandard%3A%20This%20feature%20is%20not%20standardized.
 [mdn-xpcdp]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-Permitted-Cross-Domain-Policies#:~:text=Some%20security%20testing%20tools%20will,accident%20or%20through%20malicious%20actions.
 [mdn-xpcdp-none]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-Permitted-Cross-Domain-Policies#:~:text=No%20policy%20files%20are%20allowed%20anywhere%20on%20the%20target%20server%2C%20including%20in%20a%20master%20policy%20file.
 [mdn-xpcdp-ntr]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-Permitted-Cross-Domain-Policies#:~:text=Indicates%20that%20the%20current%20document%20should%20not%20be%20used%20as%20a%20policy%20file%20despite%20other%20headers%20or%20its%20content.
 [mdn-xxp-block]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-XSS-Protection#:~:text=though%20this%20approach%20might%20be%20vulnerable%20to%20side%2Dchannel%20attacks%20if%20the%20website%20is%20embeddable%20in%20an
+[mdn-xxp-pages]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-XSS-Protection#:~:text=stopped%20pages%20from%20loading%20when%20they%20detected%20reflected%20cross%2Dsite%20scripting
 [mdn-xxp-warn]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-XSS-Protection#:~:text=in%20some%20cases%2C%20X%2DXSS%2DProtection%20can%20create%20XSS%20vulnerabilities%20in%20otherwise%20safe%20websites
 [mediacapture-default]: https://www.w3.org/TR/mediacapture-streams/#:~:text=This%20specification%20defines%20two%20policy%2Dcontrolled%20features%20identified%20by%20the%20strings%20%22camera%22%20and%20%22microphone%22.%20Both%20have%20a%20default%20allowlist%20of%20%22self%22.
+[mimesniff-js]: https://mimesniff.spec.whatwg.org/#:~:text=A%20JavaScript%20MIME%20type%20is%20any%20MIME%20type%20whose%20essence%20is%20one%20of%20the%20following
 [mimesniff-type]: https://mimesniff.spec.whatwg.org/#:~:text=If%20type%20is%20the%20empty%20string%20or%20does%20not%20solely%20contain%20HTTP%20token%20code%20points%2C%20then%20return%20failure.
 [mixed-script]: https://www.w3.org/TR/mixed-content/#:~:text=A%20request%20for%20the%20script,rather%20than%20loading%20the%20resource.
 [obs-coop-absent]: https://github.com/mdn/mdn-http-observatory/blob/093035e33568f9e5a6ef85a2afb1b9c92df296e3/src/grader/charts.js#L966-L971
@@ -902,6 +1046,7 @@ with the passage highlighted.
 [obs-xcto-absent]: https://github.com/mdn/mdn-http-observatory/blob/093035e33568f9e5a6ef85a2afb1b9c92df296e3/src/grader/charts.js#L725-L730
 [obs-xfo-absent]: https://github.com/mdn/mdn-http-observatory/blob/093035e33568f9e5a6ef85a2afb1b9c92df296e3/src/grader/charts.js#L783-L788
 [obs-xfo-csp]: https://github.com/mdn/mdn-http-observatory/blob/093035e33568f9e5a6ef85a2afb1b9c92df296e3/src/grader/charts.js#L751-L756
+[orb-blocklist]: https://github.com/annevk/orb/blob/main/README.md#:~:text=An%20opaque%2Dblocklisted%20MIME%20type%20is%20an%20HTML%20MIME%20type%2C%20JSON%20MIME%20type%2C%20or%20XML%20MIME%20type.
 [owasp-rr-critical]: https://owasp.org/www-community/OWASP_Risk_Rating_Methodology#:~:text=Overall%20Risk%20Severity,Critical
 [permissions-delegation]: https://www.w3.org/TR/permissions/#:~:text=Most%20powerful%20features%20grant%20permission,is%20known%20as%20permission%20delegation.
 [pp-default]: https://www.w3.org/TR/permissions-policy/#:~:text=Every%20policy%2Dcontrolled%20feature%20has%20a%20default%20allowlist.
@@ -914,6 +1059,21 @@ with the passage highlighted.
 [ps-hsts]: https://portswigger.net/kb/issues/01000300_strict-transport-security-not-enforced#:~:text=Typical%20severity,Low
 [ps-referer]: https://portswigger.net/kb/issues/00500400_cross-domain-referer-leakage#:~:text=Typical%20severity,Information
 [referrer-last]: https://www.w3.org/TR/referrer-policy/#:~:text=For%20each%20token%20in%20policy%2Dtokens%2C,then%20set%20policy%20to%20token.
+[rest-cc]: https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#:~:text=Instructs%20compliant%20private%20and%20shared%20HTTP%20caches%20not%20to%20store%20the%20response%20or%20reuse%20it%20for%20another%20request
+[rest-cors]: https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#:~:text=Be%20as%20specific%20as%20possible%20and%20as%20general%20as%20necessary%20when%20setting%20the%20origins%20of%20cross%2Ddomain%20calls.
+[rest-csp-dd]: https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#:~:text=The%20majority%20of%20CSP%20functionality%20only%20affects%20pages%20rendered%20as%20HTML.
+[rest-ct]: https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#:~:text=This%20must%20be%20specified%20as%20per%20the%20type%20of%20content%20returned%20by%20an%20API%20call.
+[rest-ct-guess]: https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#:~:text=If%20not%20specified%20or%20if%20specified%20incorrectly%2C%20a%20browser%20might%20attempt%20to%20guess%20the%20content%20type%20of%20the%20response.
+[rest-ct-js]: https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#:~:text=Ensure%20sending%20intended%20content%20type%20headers%20in%20your%20response%20matching%20your%20body%20content%20e.g.%20application%2Fjson%20and%20not%20application%2Fjavascript.
+[rest-dd]: https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#:~:text=The%20headers%20below%20are%20only%20intended%20to%20provide%20additional%20security%20when%20responses%20are%20rendered%20as%20HTML.
+[rest-dd-uncertain]: https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#:~:text=However%2C%20if%20there%20is%20any%20uncertainty%20about%20the%20function%20of%20the%20headers,as%20part%20of%20a%20defense%2Din%2Ddepth%20approach
+[rest-fa]: https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#:~:text=For%20an%20API%20response%2C%20there%20is%20no%20requirement%20to%20be%20framed%20in%20any%20of%20those%20elements.
+[rest-fa-dnd]: https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#:~:text=This%20header%20protects%20against%20drag%2Dand%2Ddrop%20style%20clickjacking%20attacks.
+[rest-pp]: https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#:~:text=When%20browsers%20heed%20this%20header%2C%20it%20is%20used%20to%20control%20browser%20features%20via%20directives.
+[rest-rp]: https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#:~:text=Non%2DHTML%20responses%20should%20not%20trigger%20additional%20requests.
+[rest-scope]: https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#:~:text=The%20following%20headers%20should%20be%20included%20in%20all%20API%20responses%20that%20may%20be%20consumed%20by%20browser%20clients
+[rest-stateless]: https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#:~:text=Stateful%20services%20are%20out%20of%20scope%20of%20this%20Cheat%20Sheet
+[rest-xfo]: https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#:~:text=Still%20recommended%20for%20compatibility%20with%20older%20browsers%20that%20do%20not%20support%20CSP%20Level%202.
 [rfc6266-unknown]: https://www.rfc-editor.org/rfc/rfc6266.html#:~:text=Unknown%20or%20unhandled%20disposition%20types%20SHOULD%20be%20handled%20by,recipients%20the%20same%20way%20as%20%22attachment%22
 [rfc6797-first]: https://www.rfc-editor.org/rfc/rfc6797.html#:~:text=If%20a%20UA%20receives%20more%20than%20one%20STS%20header%20field%20in%20an%20HTTP,only%20the%20first%20such%20header%20field.
 [rfc6797-invalid]: https://www.rfc-editor.org/rfc/rfc6797.html#:~:text=The%20UA%20MUST%20ignore%20any%20STS%20header%20fields%20not%20conforming%20to%20the,Response%20Header%20Field%22).
@@ -931,11 +1091,14 @@ with the passage highlighted.
 [rfc9112-fold]: https://www.rfc-editor.org/rfc/rfc9112.html#:~:text=This%20specification%20deprecates%20such%20line%20folding%20except%20within%20the%20%22message%2Fhttp%22%20media%20type
 [rfc9112-ws]: https://www.rfc-editor.org/rfc/rfc9112.html#:~:text=No%20whitespace%20is%20allowed%20between%20the%20field%20name%20and%20colon.
 [rfc9651-fail]: https://www.rfc-editor.org/rfc/rfc9651.html#:~:text=When%20parsing%20fails%2C%20the%20entire%20field%20is%20ignored
+[session-csd]: https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html#:~:text=This%20can%20be%20achieved%20by%20returning%20the%20Clear%2DSite%2DData%20response%20header
 [shp-deprecated]: https://github.com/OWASP/www-project-secure-headers/blob/master/mainsite/01_headers.md#:~:text=Feature%2DPolicy,Pragma
 [sonar-detect]: https://www.sonarsource.com/blog/encoding-differentials-why-charset-matters/#:~:text=A%20single%20occurrence%20of%20one,body%20is%20encoded%20with%20ISO%2D2022%2DJP.
 [strictcsp-fallback]: https://web.dev/articles/strict-csp#:~:text=Setting%20fallbacks%20doesn't%20reduce%20the%20security%20of%20your%20policy%20in%20modern%20browsers
 [strictcsp-https]: https://web.dev/articles/strict-csp#:~:text=All%20browsers%20that%20support%20strict%2Ddynamic%20ignore%20the%20https%3A%20fallback%2C%20so%20this%20won't%20reduce%20the%20strength%20of%20the%20policy.
 [sw-allowed]: https://w3c.github.io/ServiceWorker/#:~:text=Servers%20can%20remove%20the%20path%20restriction%20by%20setting%20a%20Service%2DWorker%2DAllowed%20header%20on%20the%20service%20worker%20script.
+[webdev-corp-all]: https://web.dev/articles/security-headers#:~:text=All%20resources%20are%20recommended%20to%20send%20this%20header%20to%20indicate%20whether%20they%20allow%20being%20loaded%20by%20other%20websites.
+[webdev-corp-api]: https://web.dev/articles/security-headers#:~:text=You%20should%20apply%20this%20to%20resources%20that%20include%20sensitive%20information%20about%20the%20user,intended%20to%20be%20called%20only%20from%20the%20same%20origin
 [zap-10015]: https://www.zaproxy.org/docs/alerts/10015/#:~:text=Risk,Informational
 [zap-10020-1]: https://www.zaproxy.org/docs/alerts/10020-1/#:~:text=Risk,Medium
 [zap-10020-4]: https://www.zaproxy.org/docs/alerts/10020-4/#:~:text=Risk,Medium

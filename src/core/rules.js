@@ -630,6 +630,8 @@
   function checkCacheControl(value, ctx) {
     const CC = 'Cache-Control';
     const d = parseDirectives(value, ',');
+    // REST API mode: the same rules, with the REST Security Cheat Sheet cited too.
+    const finding = (h, sev, title, o) => HL.models.finding(h, sev, title, ctx.api && sev > Severity.OK ? { ...o, sources: [...o.sources, 'rest-cc'] } : o);
     const bare = (name) => d.has(name) && !d.get(name);
 
     if (![...d.keys()].some((k) => CACHE_DIRECTIVES.has(k))) {
@@ -702,11 +704,21 @@
     })];
   }
 
-  function checkXXssProtection(value) {
+  function checkXXssProtection(value, ctx) {
     const H = 'X-XSS-Protection';
     const parts = value.split(';').map((p) => p.trim().toLowerCase());
     const flag = parts[0];
     const rest = parts.slice(1);
+    // REST API mode: the filter acted on pages, so what is left is an obsolete header.
+    if (ctx && ctx.api && flag === '1') {
+      const block = rest.includes('mode=block');
+      return [finding(H, Severity.LOW, block ? 'X-XSS-Protection: 1; mode=block (deprecated header)' : 'X-XSS-Protection: 1 enables the deprecated XSS filter', {
+        sources: ['mdn-xxp-pages', 'cs-xxp-rec', 'shp-deprecated'],
+        status: Status.DEPRECATED, brief: block ? 'Enables the obsolete XSS filter in block mode' : 'Enables the obsolete XSS filter',
+        description: 'The filter stopped pages from loading when it detected a reflected XSS attack, and the ways it could be abused all worked on a page being rendered. An API response is not rendered, so the filter has nothing to act on here. The header is still obsolete, and OWASP recommends not setting it, or setting it to 0. No current browser honours it.',
+        recommendation: 'Remove the header, or set it to 0.',
+      })];
+    }
     if (flag === '0') {
       return [finding(H, Severity.OK, 'X-XSS-Protection: 0 (deprecated header, disabled correctly)', {
         sources: ['cs-xxp-rec'],
@@ -881,7 +893,7 @@
     const H = 'X-DNS-Prefetch-Control';
     if (value.trim().toLowerCase() === 'off') return [finding(H, Severity.OK, 'X-DNS-Prefetch-Control: off', { sources: ['cs-xdns'] })];
     return [finding(H, ctx.absentSeverity, `X-DNS-Prefetch-Control: '${value}' (DNS prefetching enabled)`, {
-      sources: ['cs-xdns', 'bp-xdns-pii', 'bp-xdns-inj', 'mdn-xdns-doc', 'cs-xdns-nonstd'],
+      sources: ['cs-xdns', 'bp-xdns-pii', 'bp-xdns-inj', 'cs-xdns-nonstd'],
       brief: 'DNS prefetching is not disabled',
       description: DNS_PREFETCH_TEXT,
       verify: DNS_PREFETCH_VERIFY,
@@ -892,7 +904,7 @@
   // OWASP Secure Headers Project: add it to responses that "Return sensitive or
   // private content", or are "Prone to HTML injection". Either condition makes
   // it stand.
-  const DNS_PREFETCH_VERIFY = 'Is this response a web page? If it is data (JSON, a file) or a redirect, there is nothing here: check the page that shows this data instead. If it is a page, this stands when the page shows any of these: links to sites you do not control, personal or sensitive data, or input from users. Otherwise there is nothing here.';
+  const DNS_PREFETCH_VERIFY = 'Does the page show any of these: links to sites you do not control, personal or sensitive data, or input from users? If it does, this stands. If it shows none, there is nothing here.';
 
   const DNS_PREFETCH_TEXT = 'DNS prefetching resolves domains linked in the page before the user clicks. The DNS resolver learns every hostname the page links to (internal services, private subdomains, an admin panel the page references) whether or not the user navigates there. And an attacker with HTML injection can exfiltrate data through it: <link rel=dns-prefetch> resolves before any CSP directive can stop it, so a page whose CSP blocks scripts, images and connections still leaks data through DNS queries to a resolver the attacker controls. The header is non-standard and only some browsers honour it.';
 
@@ -1062,7 +1074,7 @@
   const CSD_TYPES = new Set(['"cache"', '"cookies"', '"storage"', '"executionContexts"', '"clientHints"', '"prefetchCache"', '"prerenderCache"']);
   const CSD_WILDCARD = '"*"';
   const CSD_EXPECTED = ['"cache"', '"cookies"', '"storage"'];
-  const CSD_VERIFY = 'Is this a response that ends a session: a logout, a password change, an account deletion? If it is not, there is nothing here: this header only has a job where data should stop being available, and clearing a visitor\'s storage on an ordinary page would be the defect. If it is, what the response leaves behind stays readable to whoever uses the browser next.';
+  const CSD_VERIFY = 'Is this a response that ends a session: a logout, a password change, an account deletion? If it is not, there is nothing here: this header only has a job where data should stop being available, and clearing a visitor\'s storage on an ordinary response would be the defect. If it is, what the response leaves behind stays readable to whoever uses the browser next.';
 
   function checkClearSiteData(value) {
     const H = 'Clear-Site-Data';
@@ -1169,8 +1181,8 @@
     'cross-origin-resource-policy': ['zap-90004-1', 'cs-corp'],
     'x-permitted-cross-domain-policies': ['adobe-default', 'adobe-master', 'mdn-xpcdp-none'],
     'cache-control': ['zap-10015', 'asvs-14.3.2', 'bp-cache', 'rfc9111-heuristic'],
-    'clear-site-data': ['asvs-14.3.1', 'bp-csd-logout', 'csd-logout'],
-    'x-dns-prefetch-control': ['cs-xdns', 'bp-xdns-pii', 'bp-xdns-inj', 'mdn-xdns-doc', 'cs-xdns-nonstd'],
+    'clear-site-data': ['asvs-14.3.1', 'bp-csd-logout', 'session-csd', 'csd-logout'],
+    'x-dns-prefetch-control': ['cs-xdns', 'bp-xdns-pii', 'bp-xdns-inj', 'cs-xdns-nonstd'],
     'origin-agent-cluster': ['html-oac', 'mdn-docdomain-oac', 'mdn-docdomain-shared', 'chrome-docdomain-115'],
   };
 
@@ -1203,33 +1215,197 @@
     'origin-agent-cluster': 'Origin keying is not requested',
   };
 
-  // OWASP HTTP Headers Cheat Sheet: X-Frame-Options "does not provide any
-  // security" on a redirect or a JSON API, CSP "might be meaningless" on a REST
-  // API response that is not rendered, and COOP "may not make sense" for REST
-  // APIs. On a response that is evidently not a page, their absence is a check.
-  const PAGE_ONLY = new Set(['content-security-policy', 'x-frame-options', 'cross-origin-opener-policy']);
-  const PAGE_ONLY_SOURCES = {
-    'content-security-policy': ['cs-csp-api'],
-    'x-frame-options': ['cs-xfo-api'],
-    'cross-origin-opener-policy': ['cs-coop-api'],
-  };
-  const DOCUMENT_TYPES = new Set(['text/html', 'application/xhtml+xml', 'image/svg+xml', 'text/xml', 'application/xml']);
+  // ---------------------------------------------------------------------------
+  // REST API mode. The user says the response is a call to an API read by a
+  // browser; nothing here guesses it. The reference is the OWASP REST Security
+  // Cheat Sheet: six headers for every API response, three more as defence in
+  // depth for a response that might be rendered as HTML. Headers outside it
+  // keep their page rules, except those that only act on a document.
+  // ---------------------------------------------------------------------------
+  const API_HTML_VERIFY = 'Can this API return HTML, now or in a later version (an error page, say)? If it never can, there is nothing here: the OWASP REST Security Cheat Sheet calls this header unnecessary then. If it can, or you cannot be sure, this stands.';
+  const API_DEFENCE_SOURCES = ['rest-dd', 'rest-dd-uncertain'];
+  const API_CT_REC = 'Declare the type the API returns, such as Content-Type: application/json';
+  // MIME Sniffing: the JavaScript MIME types.
+  const JS_TYPES = new Set(['application/ecmascript', 'application/javascript', 'application/x-ecmascript', 'application/x-javascript',
+    'text/ecmascript', 'text/javascript', 'text/javascript1.0', 'text/javascript1.1', 'text/javascript1.2', 'text/javascript1.3',
+    'text/javascript1.4', 'text/javascript1.5', 'text/jscript', 'text/livescript', 'text/x-ecmascript', 'text/x-javascript']);
 
-  /** Why this response is evidently not a page a browser displays, or null. */
-  function notAPage(headers, context) {
-    const code = context && context.status ? context.status.code : null;
-    if (code >= 300 && code <= 399 && code !== 304) {
-      return `This is a ${code} redirect, which a browser follows rather than displays`;
+  const apiTitle = (header, empty) => (empty ? `${header}: present but empty` : `Missing ${header}`);
+  const apiStatus = (empty) => (empty ? Status.MISCONFIGURED : Status.MISSING);
+
+  function apiCsp(value, empty) {
+    const H = 'Content-Security-Policy';
+    const view = value === null ? { frameNone: false, frameRestricted: false, frameAncestors: null, defaultNone: false, defaultSrc: null } : HL.csp.apiView(value);
+    const out = [];
+    if (view.frameNone) {
+      out.push(finding(H, Severity.OK, "CSP: frame-ancestors 'none' (no site can frame this response)", { sources: ['rest-fa'] }));
+    } else {
+      const restricted = view.frameRestricted;
+      const title = value === null ? apiTitle(H, empty)
+        : view.frameAncestors === null ? "CSP: frame-ancestors is not set, so any site can frame this response"
+          : `CSP: frame-ancestors ${view.frameAncestors} lets ${restricted ? 'the sites it names' : 'any site'} frame this response`;
+      out.push(finding(H, Severity.LOW, title, {
+        status: value === null ? apiStatus(empty) : view.frameAncestors === null ? Status.MISSING : Status.MISCONFIGURED,
+        brief: restricted ? "frame-ancestors is not 'none'" : 'Any site can frame the response',
+        description: `${restricted ? 'The sites this directive names' : 'Any site'} can load this API response in a frame. A page that frames it can lead a signed-in user to drag the data shown in it into a field the page controls (drag-and-drop clickjacking). An API response never needs to be framed, so frame-ancestors 'none' costs nothing.`,
+        recommendation: "Content-Security-Policy: frame-ancestors 'none'",
+        sources: ['rest-fa', 'rest-fa-dnd', 'rest-scope', 'asvs-3.4.6'],
+      }));
     }
-    const contentType = headers.get('content-type');
-    const mime = contentType ? extractMimeType(contentType.join(', ')) : null;
-    if (mime && !DOCUMENT_TYPES.has(mime.essence)) return `Its Content-Type is ${mime.essence}, which a browser does not display as a page`;
-    return null;
+    if (view.defaultNone) {
+      out.push(finding(H, Severity.OK, "CSP: default-src 'none' (the response may load nothing)", { sources: ['rest-csp-dd'] }));
+    } else {
+      out.push(finding(H, Severity.LOW, view.defaultSrc === null ? "CSP: default-src 'none' is not set" : `CSP: default-src ${view.defaultSrc} instead of 'none'`, {
+        status: view.defaultSrc === null ? Status.MISSING : Status.MISCONFIGURED,
+        brief: "No default-src 'none' as defence in depth",
+        description: "If this response is ever rendered as HTML (through a wrong Content-Type, MIME sniffing or an HTML error page), default-src 'none' stops it loading or running anything, so markup injected into it goes nowhere. The OWASP REST Security Cheat Sheet lists it as defence in depth.",
+        verify: API_HTML_VERIFY,
+        sources: ['rest-csp-dd', ...API_DEFENCE_SOURCES],
+      }));
+    }
+    return out;
   }
 
-  function pageOnlyVerify(reason, canonical) {
-    return `${reason}, and ${canonical} only protects a page. To check, open this URL in a browser tab, also with a wrong parameter so that an error page shows up if there is one. If you only ever get data (JSON, a file) or a redirect, there is nothing here: when this data ends up inside a page, it is that page's response that needs this header, so analyse that one. If a web page appears, this stands.`;
+  function apiXFrameOptions(value, empty, ctx, framingByCsp) {
+    const H = 'X-Frame-Options';
+    if (value === null) {
+      return [finding(H, Severity.LOW, apiTitle(H, empty), {
+        status: apiStatus(empty), brief: framingByCsp ? 'Only CSP frame-ancestors restricts framing' : 'Framing is not restricted by this header',
+        description: framingByCsp
+          ? 'CSP frame-ancestors already restricts framing in every current browser. X-Frame-Options: DENY is the legacy fallback the OWASP REST Security Cheat Sheet still recommends, for browsers without CSP Level 2.'
+          : 'Neither this header nor CSP frame-ancestors stops another site framing this API response. The OWASP REST Security Cheat Sheet recommends X-Frame-Options: DENY next to frame-ancestors \'none\', for browsers without CSP Level 2.',
+        recommendation: 'X-Frame-Options: DENY',
+        sources: ['rest-xfo', 'rest-fa'],
+      })];
+    }
+    const page = checkXFrameOptions(value, ctx);
+    if (page.length === 1 && page[0].title.startsWith('X-Frame-Options: SAMEORIGIN')) {
+      return [finding(H, Severity.LOW, 'X-Frame-Options: SAMEORIGIN instead of DENY', {
+        status: Status.MISCONFIGURED, brief: 'SAMEORIGIN instead of DENY',
+        description: 'SAMEORIGIN still lets a page on this origin frame the response. An API response never needs to be framed, and DENY is the value the OWASP REST Security Cheat Sheet recommends.',
+        recommendation: 'X-Frame-Options: DENY',
+        sources: ['rest-xfo', 'rest-fa'],
+      })];
+    }
+    return page;
   }
+
+  function apiContentType(value, empty) {
+    const H = 'Content-Type';
+    if (value === null) {
+      return [finding(H, Severity.LOW, apiTitle(H, empty), {
+        status: apiStatus(empty), brief: 'Browsers may guess the content type',
+        description: 'Without a Content-Type, a browser may guess the type from the bytes and read this API response as HTML or script (MIME sniffing). The OWASP REST Security Cheat Sheet and ASVS 4.1.1 ask every response to declare it.',
+        recommendation: API_CT_REC,
+        sources: ['rest-ct', 'rest-ct-guess', 'asvs-4.1.1'],
+      })];
+    }
+    const mime = extractMimeType(value);
+    if (!mime) {
+      return [finding(H, Severity.LOW, `Content-Type: '${value}' is not a valid MIME type`, {
+        status: Status.MISCONFIGURED, brief: 'Invalid value, so browsers may guess the type',
+        description: 'A browser cannot read a type from this value, so it is in the same position as one that received none, and may guess the type from the bytes.',
+        recommendation: API_CT_REC,
+        sources: ['rest-ct-guess', 'fetch-mime', 'asvs-4.1.1'],
+      })];
+    }
+    if (mime.essence === 'text/html') {
+      return [finding(H, Severity.LOW, 'Content-Type: text/html on an API response', {
+        status: Status.MISCONFIGURED, brief: 'Declared as HTML',
+        description: 'The response declares itself HTML, so a browser that opens it renders it as a page, and anything injected into it can run as markup.',
+        verify: 'Is the body really HTML? If it is JSON, XML or anything else, this stands: declare the type the API returns, such as application/json. If the body is HTML, there is nothing here about the type itself.',
+        sources: ['rest-ct', 'asvs-4.1.1'],
+      })];
+    }
+    if (JS_TYPES.has(mime.essence)) {
+      return [finding(H, Severity.LOW, `Content-Type: ${mime.essence} on an API response`, {
+        status: Status.MISCONFIGURED, brief: 'Declared as JavaScript',
+        description: 'The response declares itself a script. Another site can include it with <script src>, and the browser runs it there with the user\'s cookies: data the script holds can be read by that site (Cross-Site Script Inclusion). A JSON type is not run that way.',
+        verify: 'Is the body really JavaScript? If it is JSON or anything else, this stands: declare the type the API returns, such as application/json. If the body is a script, there is nothing here about the type itself.',
+        sources: ['rest-ct-js', 'mimesniff-js', 'mdn-corp-xssi'],
+      })];
+    }
+    return [finding(H, Severity.OK, `Content-Type: ${mime.essence}`, { sources: ['rest-ct'] })];
+  }
+
+  function apiPermissionsPolicy(value, empty) {
+    const H = 'Permissions-Policy';
+    const sources = ['rest-pp', ...API_DEFENCE_SOURCES];
+    const parsed = value === null ? null : parseSfDictionary(value);
+    if (parsed && parsed.ok) {
+      // OK when every feature it names is closed with (), as in the cheat
+      // sheet's example; it need not name them all.
+      const open = [...parsed.dict].filter(([, member]) => {
+        const origins = ppAllowlist(member);
+        return origins === null || origins.length > 0;   // an invalid allowlist is dropped: the default applies
+      }).map(([feature]) => feature).sort();
+      if (!open.length) return [finding(H, Severity.OK, 'Permissions-Policy: every feature it names is disabled', { sources: ['rest-pp'] })];
+      return [finding(H, Severity.LOW, `Permissions-Policy: allows ${open.join(', ')}`, {
+        status: Status.MISCONFIGURED, brief: `${open.join(', ')} allowed`,
+        description: 'An API response has no use for these features. If it is ever rendered as HTML, the policy lets it, or what it embeds, use them. The OWASP REST Security Cheat Sheet lists this header as defence in depth, with an example that disables every feature with an empty allowlist ().',
+        verify: API_HTML_VERIFY,
+        sources,
+      })];
+    }
+    return [finding(H, Severity.LOW, value === null ? apiTitle(H, empty) : `Permissions-Policy: '${value}' is not a valid policy, so none is applied`, {
+      status: value === null ? apiStatus(empty) : Status.MISCONFIGURED, brief: 'Browser features are not restricted',
+      description: 'If this response is ever rendered as HTML, nothing restricts the browser features it could use. The OWASP REST Security Cheat Sheet lists this header as defence in depth, with an example policy that disables every feature.',
+      verify: API_HTML_VERIFY,
+      sources,
+    })];
+  }
+
+  function apiReferrerPolicy(value, empty) {
+    const H = 'Referrer-Policy';
+    let n = '';
+    if (value !== null) {
+      for (const token of splitOutsideQuotes(value, ',')) {
+        if (REFERRER_POLICIES.has(token.toLowerCase())) n = token.toLowerCase();
+      }
+    }
+    if (n === 'no-referrer') return [finding(H, Severity.OK, 'Referrer-Policy: no-referrer', { sources: ['rest-rp', 'referrer-last'] })];
+    const title = value === null ? apiTitle(H, empty)
+      : n === '' ? `Referrer-Policy: unrecognized value '${value}', so no policy is in force` : `Referrer-Policy: '${n}' instead of no-referrer`;
+    return [finding(H, Severity.LOW, title, {
+      status: value === null ? apiStatus(empty) : Status.MISCONFIGURED, brief: 'no-referrer is not set',
+      description: 'A response that is not HTML triggers no further requests, so it has no referrer to send: the OWASP REST Security Cheat Sheet recommends no-referrer. It only matters if this response is ever rendered as HTML and loads or links to something.',
+      verify: API_HTML_VERIFY,
+      sources: ['rest-rp', ...API_DEFENCE_SOURCES],
+    })];
+  }
+
+  function apiCorp(value, empty, ctx) {
+    const H = 'Cross-Origin-Resource-Policy';
+    if (value !== null) return checkCorp(value, ctx);
+    return [finding(H, Severity.LOW, apiTitle(H, empty), {
+      status: apiStatus(empty), brief: 'Any site can load the response',
+      description: "Without CORP, any site can load this endpoint with a tag such as <script> or <img>. If the browser sends the user's cookies with it, the response, with the user's data, enters that site's process: a response that parses as script can be read directly (Cross-Site Script Inclusion), any response is exposed to Spectre-style reads, and whether it loads tells the site whether the user is signed in. Cross-Origin-Resource-Policy: same-origin makes the browser drop the response first. Browsers that implement opaque response blocking already withhold a JSON, HTML or XML response from such a tag, when the Content-Type is right; CORP asks for the same protection explicitly, from every browser and for every type of response, as defence in depth.",
+      verify: 'Does this endpoint answer GET requests with user data, authenticated by cookies? If it does not (it only accepts POST, it authenticates with an Authorization header, or every cookie it relies on is set with SameSite=Lax or Strict), a tag on another site gets nothing of the user\'s and there is nothing here. If it does, this stands: set Cross-Origin-Resource-Policy: same-origin.',
+      sources: ['webdev-corp-api', 'webdev-corp-all', 'mdn-corp-xssi', 'mdn-corp-nocors', 'orb-blocklist', 'fetch-method-get', 'mdn-samesite-lax', 'mdn-samesite-default'],
+    })];
+  }
+
+  // Headers that act on a document only: an API response is not one.
+  const API_NOT_APPLICABLE = {
+    'cross-origin-opener-policy': ['COOP decides which windows a document shares its browsing context group with. An API response is not a window, so the header has no effect on it, sent or not.', ['cs-coop-api']],
+    'cross-origin-embedder-policy': ['COEP sets the policy a document applies when it loads cross-origin resources. An API response loads nothing, so the header has no effect on it, sent or not.', ['mdn-coep-doc']],
+    'origin-agent-cluster': ['Origin-Agent-Cluster asks for a document to be placed in an origin-keyed agent cluster. An API response is not a document, so the header has no effect on it, sent or not.', ['mdn-oac-doc']],
+    'x-dns-prefetch-control': ['DNS prefetching acts on the links and resources a document references. An API response references none, so the header has no effect on it, sent or not.', ['mdn-xdns-doc']],
+  };
+
+  function apiNotApplicable(key, canonical) {
+    const [description, sources] = API_NOT_APPLICABLE[key];
+    return () => [finding(canonical, Severity.OK, `${canonical}: not applicable to an API response`, { status: Status.NONE, description, sources })];
+  }
+
+  const API_CHECKERS = {
+    'content-security-policy': apiCsp,
+    'x-frame-options': apiXFrameOptions,
+    'content-type': apiContentType,
+    'permissions-policy': apiPermissionsPolicy,
+    'referrer-policy': apiReferrerPolicy,
+    'cross-origin-resource-policy': apiCorp,
+  };
 
   /** 63072000 -> "2-year"; anything not a whole number of years stays in seconds. */
   function duration(seconds) {
@@ -1248,12 +1424,17 @@
    */
   function analyzeHeaders(headers, profile, context) {
     const results = [];
-    const notPage = notAPage(headers, context);
+    const mode = HL.profiles.getMode(context && context.mode ? context.mode.id : 'page');
+    const api = mode.id === 'api';
     const cspValues = headers.get('content-security-policy');
     const framingByCsp = !!cspValues && HL.csp.restrictsFraming(cspValues.join(', '));
 
     for (const [key, canonical, registryAbsent] of SECURITY_HEADERS) {
-      if (profile.skip.has(key)) continue;
+      if (!HL.profiles.inScope(key, profile, mode)) continue;
+      if (api && (API_CHECKERS[key] || API_NOT_APPLICABLE[key])) {
+        results.push(apiResult(key, canonical, headers.get(key), profile, framingByCsp));
+        continue;
+      }
       let absentSeverity = registryAbsent;
       // CSP frame-ancestors replaces X-Frame-Options in every browser that has
       // it (ASVS 3.4.6 asks for frame-ancestors). XFO is then only the fallback
@@ -1262,17 +1443,16 @@
       if (xfoFallbackOnly) absentSeverity = Severity.LOW;
       // Browsers ignore an empty header, so empty and absent are the same state;
       // a value a browser cannot use weighs the same as well (ctx.absentSeverity).
-      const ctx = { absentSeverity: absentSeverity === null ? Severity.LOW : absentSeverity, hsts: profile.hsts };
+      const ctx = { absentSeverity: absentSeverity === null ? Severity.LOW : absentSeverity, hsts: profile.hsts, api };
 
       const occurrences = headers.get(key);
       const findings = [];
       let value = null;
 
-      const verify = MISSING_VERIFY[key] || (notPage && PAGE_ONLY.has(key) ? pageOnlyVerify(notPage, canonical) : '');
-      const pageOnly = notPage && PAGE_ONLY.has(key) && !MISSING_VERIFY[key];
+      const verify = MISSING_VERIFY[key] || '';
       const missingSources = [
         ...(xfoFallbackOnly ? ['csp3-fa-xfo', 'cs-xfo-fa', 'obs-xfo-csp'] : (MISSING_SOURCES[key] || [])),
-        ...(pageOnly ? PAGE_ONLY_SOURCES[key] : []),
+        ...(api && key === 'cache-control' ? ['rest-cc'] : []),
       ];
       // Pragma beside a missing Cache-Control usually means it was meant to do
       // Cache-Control's job, which in a response it was never defined to do.
@@ -1320,6 +1500,22 @@
       }
     }
     return results;
+  }
+
+  /** One header in REST API mode: duplicates resolved as in page mode, then judged as an API response. */
+  function apiResult(key, canonical, occurrences, profile, framingByCsp) {
+    const findings = [];
+    let value = null;
+    if (occurrences) {
+      const resolved = resolveDuplicates(key, canonical, occurrences);
+      value = resolved.value;
+      if (resolved.note) findings.push(resolved.note);
+    }
+    const empty = value !== null && value.trim() === '';
+    const ctx = { absentSeverity: Severity.LOW, hsts: profile.hsts };
+    const check = API_CHECKERS[key] || apiNotApplicable(key, canonical);
+    findings.push(...check(empty || value === null ? null : value, empty, ctx, framingByCsp));
+    return { key, name: canonical, value, present: value !== null, findings };
   }
 
   const SEVERITY_BY_VALUE = Object.fromEntries(Object.values(Severity).map((v) => [v, true]));

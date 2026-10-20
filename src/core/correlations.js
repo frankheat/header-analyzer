@@ -111,11 +111,14 @@
     const xfo = byKey.get(XFO);
     const csp = byKey.get(CSP);
     if (!xfo || !csp || !xfo.present) return [];
-    if (!csp.findings.some((f) => f.title === PERMISSIVE_FRAME_ANCESTORS)) return [];
+    // Web page mode grades the CSP's permissive frame-ancestors with PERMISSIVE_FRAME_ANCESTORS;
+    // REST API mode names the value it read.
+    const permissive = (f) => f.title === PERMISSIVE_FRAME_ANCESTORS || /^CSP: frame-ancestors .+ lets any site frame this response$/.test(f.title);
+    if (!csp.findings.some(permissive)) return [];
     return [[XFO, finding('X-Frame-Options', Severity.OK, 'X-Frame-Options: replaced by the CSP, which allows framing', {
       sources: ['csp3-fa-xfo', 'html-xfo-csp'],
       status: Status.NONE,
-      description: 'A browser that implements CSP frame-ancestors does not read this header at all: the directive\'s presence replaces it, whatever its value. Here it is permissive, so the page can be framed by anyone, and this header protects only browsers old enough to ignore CSP entirely. The exposure is graded on the Content-Security-Policy row; what is said here is that this one does not offset it.',
+      description: 'A browser that implements CSP frame-ancestors does not read this header at all: the directive\'s presence replaces it, whatever its value. Here it is permissive, so anyone can frame this response, and this header protects only browsers old enough to ignore CSP entirely. The exposure is graded on the Content-Security-Policy row; what is said here is that this one does not offset it.',
       recommendation: 'Restrict frame-ancestors, and keep this header for the browsers that do not implement it.',
     })]];
   }

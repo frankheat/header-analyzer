@@ -108,7 +108,7 @@ test('the basic profile skips the extended-only headers and keeps the core ones'
   const r = analyze(['X-Nothing: x'], PROFILES.basic);
   for (const k of ['origin-agent-cluster', 'service-worker-allowed', 'content-disposition', 'pragma', 'expires', 'etag', 'x-download-options']) assert.ok(!(k in r), k);
   for (const k of ['permissions-policy', 'x-dns-prefetch-control', 'x-xss-protection', 'expect-ct', 'content-type', 'access-control-allow-origin', 'access-control-allow-credentials']) assert.ok(k in r, k);
-  assert.equal(Object.keys(r).length, 18);
+  assert.equal(Object.keys(r).length, 17);
 });
 
 test('the extended profile checks more headers, asks about preload and expects DNS prefetch control', () => {

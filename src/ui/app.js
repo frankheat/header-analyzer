@@ -4,7 +4,7 @@
  * Rules this file keeps:
  *   - every piece of text that came from the input reaches the page through
  *     textContent or a text node, never through innerHTML;
- *   - the input is never persisted: only the profile and appearance choices;
+ *   - the input is never persisted: only the profile, mode and appearance choices;
  *   - a failure anywhere in rendering is caught and shown, never left as a
  *     blank pane.
  */
@@ -71,6 +71,7 @@
 
   const state = {
     profile: HL.profiles.getProfile(storage.get('profile')).id,
+    mode: HL.profiles.getMode(storage.get('mode')).id,
     filter: 'all',
     query: '',
     report: null,
@@ -140,6 +141,31 @@
     storage.set('profile', state.profile);
     applyProfile();
     runAnalysis(true);
+  }
+
+  // ------------------------------------------------------------------- mode
+  // What the response is: the user's choice, never guessed from the response.
+
+  const MODE_HINT = {
+    page: 'The response is a page a browser displays',
+    api: 'The response is a call to an API read by a browser (OWASP REST Security Cheat Sheet)',
+  };
+
+  function applyMode() {
+    for (const b of document.querySelectorAll('#mode-control [data-mode]')) {
+      const on = b.dataset.mode === state.mode;
+      b.setAttribute('aria-checked', String(on));
+      b.tabIndex = on ? 0 : -1;
+      b.title = MODE_HINT[b.dataset.mode];
+    }
+  }
+
+  function setMode(id, analyse = true) {
+    if (id === state.mode) return;
+    state.mode = HL.profiles.getMode(id).id;
+    storage.set('mode', state.mode);
+    applyMode();
+    if (analyse) runAnalysis(true);
   }
 
   function initSegmented(container, onSelect) {
@@ -221,7 +247,7 @@
     if (!force && text === state.lastInput) return;
     state.lastInput = text;
 
-    const report = HL.engine.analyze(text, state.profile);
+    const report = HL.engine.analyze(text, state.profile, state.mode);
     state.report = report;
     render();
     if (report.ok) {
@@ -269,7 +295,7 @@
     }
     if (!report.ok) return [errorState('Nothing to analyse', report.error)];
 
-    const nodes = [];
+    const nodes = [contextCard(report)];
     if (report.notes.length) nodes.push(notesCard(report.notes));
     nodes.push(filterBar(report));
     nodes.push(...listSections(report));
@@ -312,6 +338,16 @@
       copyText(lines.map((l) => `- ${l.text}`).join('\n'), done);
     });
     return el('div', { className: 'menu-anchor copy-anchor' }, button, menu);
+  }
+
+  /** Which rules produced the report; in REST API mode, what the response is taken to be. */
+  function contextCard(report) {
+    const api = report.mode.id === 'api';
+    return el('div', { className: 'report-context' },
+      el('p', null,
+        el('strong', { text: `${report.profile.name} · ${report.mode.name}` }),
+        api ? ' · Evaluated as an API called from a browser.' : ''),
+      api ? sourcesNode(['rest-scope']) : null);
   }
 
   function notesCard(notes) {
@@ -530,11 +566,13 @@
   function init() {
     applyTheme();
     applyProfile();
+    applyMode();
 
     const input = $('input');
     input.addEventListener('input', scheduleAnalysis);
 
     initSegmented($('profile-control'), (b) => setProfile(b.dataset.profile));
+    initSegmented($('mode-control'), (b) => setMode(b.dataset.mode));
 
     const samplesMenu = $('samples-menu');
     for (const s of HL.samples) {
@@ -543,7 +581,10 @@
     }
     initMenu($('samples-button'), samplesMenu, (item) => {
       const s = HL.samples.find((x) => x.id === item.dataset.sample);
-      if (s) loadText(s.text);
+      if (s) {
+        if (s.mode) setMode(s.mode, false);
+        loadText(s.text);
+      }
     });
     $('theme-button').addEventListener('click', () => {
       storage.set('theme', currentTheme() === 'dark' ? 'light' : 'dark');

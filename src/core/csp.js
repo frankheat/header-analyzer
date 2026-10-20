@@ -662,6 +662,25 @@
     });
   }
 
+  /**
+   * REST API mode reads only two directives (OWASP REST Security Cheat Sheet):
+   * frame-ancestors, and default-src as defence in depth. Across several
+   * policies a resource must pass every one, so one strict policy is enough.
+   */
+  function apiView(value) {
+    const policies = value.split(',').map((p) => p.trim()).filter((p) => p !== '').map(parsePolicy);
+    const only = (d, token) => d.lower.length === 0 || (d.lower.length === 1 && d.lower[0] === token);
+    const frame = policies.map((p) => p.directives.get('frame-ancestors')).filter(Boolean);
+    const dflt = policies.map((p) => p.directives.get('default-src')).filter(Boolean);
+    return {
+      frameNone: frame.some((d) => only(d, "'none'")),
+      frameRestricted: frame.some((d) => !d.lower.some(permissiveAncestor)),
+      frameAncestors: frame.length ? frame[0].tokens.join(' ') : null,
+      defaultNone: dflt.some((d) => only(d, "'none'")),
+      defaultSrc: dflt.length ? dflt[0].tokens.join(' ') : null,
+    };
+  }
+
   function evaluatePolicy(policy) {
     const out = new Collector();
     checkStructure(policy, out);
@@ -712,6 +731,7 @@
   HL.csp = Object.freeze({
     evaluateCsp,
     restrictsFraming,
+    apiView,
     PERMISSIVE_FRAME_ANCESTORS,
   });
 })(globalThis.HeaderAnalyzer = globalThis.HeaderAnalyzer || {});

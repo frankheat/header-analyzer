@@ -43,10 +43,12 @@
   /**
    * @param {string} text       raw response text
    * @param {string} profileId  'basic' | 'extended'
+   * @param {string} modeId     'page' | 'api': what the user says the response is
    */
-  function analyze(text, profileId) {
+  function analyze(text, profileId, modeId) {
     const profile = HL.profiles.getProfile(profileId);
-    const meta = { version: VERSION, profile: { id: profile.id, name: profile.name } };
+    const mode = HL.profiles.getMode(modeId);
+    const meta = { version: VERSION, profile: { id: profile.id, name: profile.name }, mode: { id: mode.id, name: mode.name } };
     try {
       if (typeof text !== 'string' || text.trim() === '') {
         return failure('empty', meta);
@@ -59,7 +61,7 @@
       }
 
       const notes = [...parsed.notes, ...response.notes];
-      const results = HL.rules.analyzeHeaders(HL.parser.headerMap(response), profile, { status: response.status });
+      const results = HL.rules.analyzeHeaders(HL.parser.headerMap(response), profile, { status: response.status, mode });
       return Object.assign(meta, {
         ok: true,
         error: null,
