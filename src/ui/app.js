@@ -5,6 +5,8 @@
  *   - every piece of text that came from the input reaches the page through
  *     textContent or a text node, never through innerHTML;
  *   - the input is never persisted: only the profile, mode and appearance choices;
+ *     what the user decides about findings to confirm lives in memory and is
+ *     dropped with the report it belongs to;
  *   - a failure anywhere in rendering is caught and shown, never left as a
  *     blank pane.
  */
@@ -90,6 +92,8 @@
     query: '',
     report: null,
     open: new Set(),
+    // Findings to confirm the user has checked: decisionKey -> 'confirmed' | 'excluded'.
+    decisions: new Map(),
     lastInput: null,
   };
 
@@ -263,6 +267,7 @@
 
     const report = HL.engine.analyze(text, state.profile, state.mode);
     state.report = report;
+    state.decisions.clear();
     render();
     if (report.ok) {
       const s = report.summary;
@@ -311,8 +316,9 @@
 
     const nodes = [];
     if (report.notes.length) nodes.push(notesCard(report.notes));
-    nodes.push(filterBar(report));
-    nodes.push(...listSections(report));
+    const view = HL.engine.resolve(report, state.decisions);
+    nodes.push(filterBar(report, view));
+    nodes.push(...listSections(report, view));
     return nodes;
   }
 
@@ -327,7 +333,7 @@
    */
   const LIST_SHOW = [
     ['all', 'All findings', 'Every header with a finding'],
-    ['confirmed', 'Confirmed', 'Settled by the response itself'],
+    ['confirmed', 'Confirmed', 'Settled by the response, or checked by you'],
     ['toConfirm', 'To confirm', 'Depend on a check the response cannot show'],
   ];
 
@@ -362,21 +368,26 @@
     return details;
   }
 
-  function matchesFilter(r) {
+  /**
+   * `r` is the result as the user's decisions leave it, `raw` as analysed.
+   * "To confirm" keeps showing a row after its checks are decided, so the
+   * decisions stay in view and can be changed.
+   */
+  function matchesFilter(r, raw) {
     if (state.filter === 'issues' && worstSeverity(r) < Severity.LOW) return false;
-    if (state.filter === 'confirm' && !r.findings.some(isContingent)) return false;
+    if (state.filter === 'confirm' && !raw.findings.some(isContingent)) return false;
     if (state.query) {
       const q = state.query.toLowerCase();
-      const hay = [r.name, r.value || '', ...r.findings.map((f) => f.title)].join('\n').toLowerCase();
+      const hay = [raw.name, raw.value || '', ...raw.findings.map((f) => f.title)].join('\n').toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
   }
 
-  function filterBar(report) {
+  function filterBar(report, view) {
     const counts = {
       all: report.results.length,
-      issues: report.results.filter((r) => worstSeverity(r) >= Severity.LOW).length,
+      issues: view.results.filter((r) => worstSeverity(r) >= Severity.LOW).length,
       confirm: report.results.filter((r) => r.findings.some(isContingent)).length,
     };
     // M3 filter chips behaving as a single-choice group.
@@ -401,20 +412,20 @@
     input.addEventListener('input', () => {
       state.query = input.value.trim();
       for (const n of document.querySelectorAll('.result-section')) n.remove();
-      $('results-root').append(...listSections(state.report));
+      $('results-root').append(...listSections(state.report, HL.engine.resolve(state.report, state.decisions)));
     });
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && input.value) { e.stopPropagation(); input.value = ''; input.dispatchEvent(new Event('input')); }
     });
     return el('div', { className: 'filter-bar' },
       el('label', { className: 'search-bar' }, icon('i-search'), input),
-      el('div', { className: 'filter-row' }, chips, copyMenu(report)));
+      el('div', { className: 'filter-row' }, chips, copyMenu(view)));
   }
 
-  function listSections(report) {
-    const rows = report.results
-      .map((r, order) => ({ r, order, worst: worstSeverity(r) }))
-      .filter(({ r }) => matchesFilter(r))
+  function listSections(report, view) {
+    const rows = view.results
+      .map((r, order) => ({ r, raw: report.results[order], order, worst: worstSeverity(r) }))
+      .filter(({ r, raw }) => matchesFilter(r, raw))
       .sort((a, b) => b.worst - a.worst || a.order - b.order);
 
     if (!rows.length) {
@@ -430,12 +441,13 @@
       if (!group.length) continue;
       out.push(el('section', { className: 'result-section', attrs: { 'aria-label': title } },
         el('h3', { className: 'section-header' }, title, el('span', { className: 'section-count', text: String(group.length) })),
-        el('div', { className: 'card list', attrs: { role: 'list' } }, group.map(({ r }) => resultRow(r)))));
+        el('div', { className: 'card list', attrs: { role: 'list' } }, group.map(({ r, raw }) => resultRow(r, raw)))));
     }
     return out;
   }
 
-  function resultRow(r) {
+  /** `r` drives the row's badges, as the user's decisions leave it; `raw` lists every finding with its decision. */
+  function resultRow(r, raw) {
     const worst = worstSeverity(r);
     const contingent = resultIsContingent(r);
     const absent = r.value === null;
@@ -461,12 +473,13 @@
           on: { click: () => copyText(r.value, 'Value copied') },
         }, icon('i-copy'))));
     }
-    const shown = r.findings.filter((f) => f.severity > Severity.OK || f.description || f.recommendation);
-    const findings = (shown.length ? shown : r.findings).slice().sort((a, b) => b.severity - a.severity);
+    const indexed = raw.findings.map((f, i) => ({ f, key: HL.engine.decisionKey(raw, i) }));
+    const shown = indexed.filter(({ f }) => f.severity > Severity.OK || f.description || f.recommendation);
+    const findings = (shown.length ? shown : indexed).slice().sort((a, b) => b.f.severity - a.f.severity);
     if (!findings.length) {
       detail.append(el('p', { className: 'finding-desc', text: absent ? 'Not sending it is the correct state for this header.' : 'Nothing to report.' }));
     }
-    for (const f of findings) detail.append(findingNode(f));
+    for (const { f, key } of findings) detail.append(findingNode(f, key));
 
     const details = el('details', { className: 'row', attrs: { role: 'listitem', 'data-key': r.key } }, summary, detail);
     if (state.open.has(r.key)) details.open = true;
@@ -476,24 +489,55 @@
     return details;
   }
 
-  /** A finding with a severity carries its badge; an OK finding is a note: explained, never graded. */
-  function findingNode(f) {
+  const DECISION_LABEL = { confirmed: 'Confirmed manually', excluded: 'Excluded' };
+
+  /**
+   * A finding with a severity carries its badge; an OK finding is a note:
+   * explained, never graded. A finding to confirm also carries the user's
+   * decision: confirmed (settled from now on) or excluded (dropped).
+   */
+  function findingNode(f, key) {
     const note = f.severity === Severity.OK;
-    const node = el('div', { className: `finding${note ? ' note' : ''}` },
+    const contingent = isContingent(f);
+    const decision = contingent ? state.decisions.get(key) : undefined;
+    const node = el('div', { className: `finding${note ? ' note' : ''}${decision ? ' decided-' + decision : ''}` },
       el('div', { className: 'finding-head' },
-        note ? icon('i-info', 'note-icon') : badge(f.severity, isContingent(f)),
+        note ? icon('i-info', 'note-icon') : badge(f.severity, contingent && decision !== 'confirmed'),
         el('span', { className: 'finding-title', text: f.title })));
     if (f.description) node.append(el('p', { className: 'finding-desc', text: f.description }));
     if (f.verify) {
-      node.append(el('div', { className: 'callout verify' }, icon('i-help'),
-        el('div', null, el('span', { className: 'callout-label', text: note ? 'Check' : 'To confirm' }), f.verify)));
+      const label = note ? 'Check' : DECISION_LABEL[decision] || 'To confirm';
+      node.append(el('div', { className: 'callout verify' }, icon(decision === 'confirmed' ? 'i-check' : 'i-help'),
+        el('div', null, el('span', { className: 'callout-label', text: label }), f.verify)));
     }
+    if (contingent) node.append(decisionChips(key, decision));
     if (f.recommendation) {
       node.append(el('div', { className: 'callout rec' }, icon('i-bulb'),
         el('div', null, el('span', { className: 'callout-label', text: 'Recommendation' }), f.recommendation)));
     }
     if (f.sources.length) node.append(sourcesNode(f.sources));
     return node;
+  }
+
+  /** Two toggles under a finding to confirm; pressing the active one again reopens it. */
+  function decisionChips(key, decision) {
+    const set = el('div', { className: 'chip-set decision-set', attrs: { role: 'group', 'aria-label': 'Result of the check' } });
+    for (const [value, label] of [['confirmed', 'Confirmed'], ['excluded', 'Excluded']]) {
+      set.append(el('button', {
+        className: 'filter-chip',
+        attrs: { type: 'button', 'aria-pressed': String(decision === value), 'data-decision': `${key}|${value}` },
+        on: { click: () => decide(key, decision === value ? null : value) },
+      }, icon('i-check', 'chip-check'), label));
+    }
+    return set;
+  }
+
+  function decide(key, value) {
+    if (value) state.decisions.set(key, value); else state.decisions.delete(key);
+    render();
+    const again = document.querySelector(`[data-decision="${CSS.escape(key)}|${value || 'confirmed'}"]`);
+    if (again) again.focus();
+    announce(value ? `Marked as ${value}` : 'Back to confirm');
   }
 
   /**

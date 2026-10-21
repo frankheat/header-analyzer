@@ -36,6 +36,9 @@ curl -si https://example.com
 - A Burp *request and response* copy. The request is skipped.
 - Headers copied from browser DevTools, with or without a status line.
 
+The body is not needed. In REST API mode, when it is there, it settles one
+check: a JSON body declared as `text/html` or as JavaScript.
+
 ## What you get
 
 - **Three severities: HIGH, MEDIUM, LOW.** They are anchored on OWASP ZAP,
@@ -51,6 +54,11 @@ curl -si https://example.com
   as a bulleted list. Its menu chooses what to copy: **All** findings, only the
   **Confirmed** ones (settled by the response), or only those **To confirm**.
   Each header appears once per list.
+- **Checks you record.** A finding to confirm has two buttons, **Confirmed** and
+  **Excluded**. A confirmed finding counts as settled, like the others; an
+  excluded one leaves the badges and the copied lists.
+  Pressing the active button again reopens it. The choices live only in the open
+  page: a new response, or another profile or mode, starts again.
 - **A row for each header.** Its value, every finding, and either a recommendation
   or the check that settles it.
 - **Sources for every claim.** Each finding lists the passages it rests on (OWASP,
@@ -81,12 +89,6 @@ settles them and what each outcome means. Their severity is what the response
 shows; the worst case a check could reveal is stated in the check itself. They are
 marked `?`. A header whose badge is settled but that also holds findings to
 confirm shows how many beside it, as `+1 ?`.
-
-One case where the response itself makes a finding uncertain:
-
-- **HTML without a usable charset.** A `text/html` response with no `charset`, or
-  one the browser does not recognise, is to confirm. The page can still declare
-  the encoding with `<meta charset>`, which the headers do not show.
 
 ## Privacy and security of the tool itself
 

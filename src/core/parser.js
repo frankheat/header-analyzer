@@ -6,7 +6,7 @@
  * and informational 1xx responses such as the `100 Continue` that `curl -i`
  * prints before the real one. DevTools copies headers with no status line at
  * all, which is accepted too. Everything after the response's header section is
- * its body and is ignored, status lines included.
+ * its body, kept as text and never parsed for headers, status lines included.
  *
  * Field lines follow RFC 9112 §5: `name ":" OWS value OWS`. Lines a browser
  * would discard are discarded here too, and each is reported as a parse note so
@@ -103,7 +103,8 @@
 
   /**
    * Read the response in `text`.
-   * Returns {response: {status, fields, notes}, notes, request, error}.
+   * Returns {response: {status, fields, notes, body}, notes, request, error}.
+   * `body` is the text after the blank line that ends the headers, '' if none.
    */
   function parseResponse(text) {
     const notes = [];
@@ -162,7 +163,8 @@
       const st = status || (section.pseudoStatus
         ? { version: '2', code: section.pseudoStatus, reason: '', line: `:status: ${section.pseudoStatus}` }
         : null);
-      return { response: { status: st, fields: section.fields, notes: section.notes }, notes, request };
+      const body = lines.slice(section.end).join('\n');
+      return { response: { status: st, fields: section.fields, notes: section.notes, body }, notes, request };
     }
   }
 

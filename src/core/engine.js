@@ -61,7 +61,7 @@
       }
 
       const notes = [...parsed.notes, ...response.notes];
-      const results = HL.rules.analyzeHeaders(HL.parser.headerMap(response), profile, { status: response.status, mode });
+      const results = HL.rules.analyzeHeaders(HL.parser.headerMap(response), profile, { status: response.status, mode, body: response.body });
       return Object.assign(meta, {
         ok: true,
         error: null,
@@ -97,7 +97,8 @@
    * selects which: 'all' (the default), 'confirmed' (only findings the response
    * settles) or 'toConfirm' (only those that need a check, each marked
    * "(to confirm)"). A header with both kinds appears under each, with the
-   * findings of that kind.
+   * findings of that kind. A finding the user confirmed (see resolve) counts as
+   * settled.
    * Lines are sorted by their most severe finding; ties keep the report's order.
    */
   const SHOW = ['all', 'confirmed', 'toConfirm'];
@@ -144,5 +145,33 @@
     return lines.map(({ rank, order, ...line }) => line);
   }
 
-  HL.engine = Object.freeze({ analyze, findingList, VERSION });
+  const DECISIONS = ['confirmed', 'excluded'];
+
+  /** The key a decision is stored under: the header, then the finding's place in it. */
+  function decisionKey(result, index) {
+    return `${result.key}#${index}`;
+  }
+
+  /**
+   * The report as the user's checks leave it. `decisions` maps decisionKey()
+   * to 'confirmed' or 'excluded', and only findings to confirm take one: a
+   * confirmed finding becomes settled; an excluded one is
+   * dropped. Everything else, and the report passed in, stays as it was.
+   */
+  function resolve(report, decisions) {
+    if (!report || !report.ok || !decisions || !decisions.size) return report;
+    const results = report.results.map((r) => {
+      const findings = [];
+      r.findings.forEach((f, i) => {
+        const d = isContingent(f) ? decisions.get(decisionKey(r, i)) : undefined;
+        if (d !== undefined && !DECISIONS.includes(d)) throw new Error(`Unknown decision: ${d}`);
+        if (d === 'excluded') return;
+        findings.push(d === 'confirmed' ? Object.assign({}, f, { verify: '' }) : f);
+      });
+      return Object.assign({}, r, { findings });
+    });
+    return Object.assign({}, report, { results, summary: summarize(results) });
+  }
+
+  HL.engine = Object.freeze({ analyze, findingList, resolve, decisionKey, VERSION });
 })(globalThis.HeaderAnalyzer = globalThis.HeaderAnalyzer || {});

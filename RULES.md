@@ -136,6 +136,12 @@ Besides the detailed report, the findings can be copied as one line per header:
   check (each ending with "(to confirm)"). A header with both kinds
   appears under Confirmed and under To confirm, each time with the findings of
   that kind.
+- **Checks recorded by the user:** a finding to confirm can be marked
+  Confirmed or Excluded under it. Confirmed moves it to the Confirmed list with
+  its severity unchanged, written like any settled finding; Excluded removes it
+  from every list and from the row's badge. The row badge and the "+N" marker
+  follow these choices; the "To confirm" filter keeps showing the row, so a
+  choice can be changed. Nothing is stored: a new analysis starts with none.
 - **Several problems in one header:** each header appears once. The line takes the
   status of its most severe problem (on a tie: Missing, then Misconfigured, then
   Deprecated, then Duplicated). The short descriptions are joined with `; ` from most
@@ -278,7 +284,7 @@ Absent: **MEDIUM**. RFC 6797 §6.1.
 | `max-age=0` | **MEDIUM** | [Deletes the policy][rfc6797-zero]: as absent. *Deviation:* [ZAP 10035-2 Low][zap-10035-2] |
 | max-age below the 2-year profile minimum | LOW | [ASVS 3.4.1 asks ≥ 1 year][asvs-3.4.1], [OWASP Cheat Sheet 2 years][cs-hsts-rec], [hstspreload.org 1 year][hstspreload-min]; [Observatory −10 only below 6 months][obs-hsts-short] |
 | No includeSubDomains | LOW | [ASVS 3.4.1 from L2][asvs-3.4.1]; [OWASP][bp-hsts] |
-| Extended: preload not declared, or declared | LOW, to confirm | [OWASP Cheat Sheet recommends preload][cs-hsts-rec]; [the token only requests inclusion][hstspreload-token], so list membership is the check |
+| Extended: preload not declared, or declared | LOW, to confirm | [OWASP Cheat Sheet recommends preload][cs-hsts-rec]; [the token only requests inclusion][hstspreload-token], so list membership is the check. The header must be [served on the base domain][hstspreload-base] and [preloading covers all subdomains][hstspreload-subdomains], so on a subdomain the check is the base domain's entry (example.com for api.example.com): a subdomain's own header need not carry the token |
 
 ## X-Frame-Options
 
@@ -356,7 +362,7 @@ Absent: **LOW**. [The last recognised token wins][referrer-last].
 | Effective policy | Severity |
 |---|---|
 | `no-referrer`, `same-origin`, `strict-origin`, `strict-origin-when-cross-origin` | OK ([Secure Headers][bp-rp], [Cheat Sheet][cs-rp-default]) |
-| `origin`, `origin-when-cross-origin` | LOW, to confirm (plain-HTTP destinations?) |
+| `origin`, `origin-when-cross-origin` | LOW: the origin also reaches plain-HTTP destinations, which the `strict-` variants withhold at no cost; weaker than the [default applied when the header is absent][cs-rp-default] |
 | `no-referrer-when-downgrade`, `unsafe-url` | LOW: [Observatory −5][obs-rp-unsafe]; [PortSwigger Information][ps-referer] |
 | No recognised token | LOW (as absent) |
 
@@ -476,8 +482,13 @@ are recognised, `utf_8` or `foo` are not.
 | Condition | Severity |
 |---|---|
 | `text/html` with a `charset` the browser recognises | OK: [the transport encoding is used][html-charset-transport] |
-| `text/html` with an unrecognised `charset` | LOW, Misconfigured, to confirm: browsers discard it and guess, as if none were declared |
-| `text/html` without a `charset` | LOW, Misconfigured, to confirm: the page itself can declare it with `<meta charset>` [in its first 1024 bytes][html-charset-1024], or a UTF-8 byte order mark, which a header-only review cannot see |
+| `text/html` with an unrecognised `charset` | LOW, Misconfigured: browsers discard it and guess, as if none were declared |
+| `text/html` without a `charset` | LOW, Misconfigured |
+
+A `<meta charset>` in the page does not change the grade. It counts only [in
+the first 1024 bytes][html-charset-1024] and is read from the page itself,
+while [an encoding the transport layer specifies is taken as certain][html-charset-transport];
+the OWASP Cheat Sheet asks for the attribute on the header.
 | Any other type, an unparseable value, or no Content-Type | OK, not graded |
 
 ## Content-Disposition, Pragma, Expires, ETag (Extended)
@@ -513,12 +524,26 @@ changes is the criterion.
 |---|---|---|---|
 | Content-Security-Policy | `frame-ancestors 'none'` | **LOW** | [An API response never needs to be framed][rest-fa]; it [protects against drag-and-drop clickjacking][rest-fa-dnd]; [ASVS 3.4.6][asvs-3.4.6]. *Deviation:* in Web page mode missing anti-framing is MEDIUM. Here the attack needs an endpoint answering GET, cookies a cross-site frame still sends, and the user dragging data out, so it is graded LOW. A `frame-ancestors` naming sites is LOW too |
 | Content-Type | the type of the body | **LOW** | [Must be specified as per the content returned][rest-ct], or [a browser might guess it][rest-ct-guess]; [ASVS 4.1.1][asvs-4.1.1]. An invalid value is LOW as well. No charset is asked of `application/json`: ASVS 4.1.1 asks for it on text and XML types |
-| Content-Type `text/html` | | LOW, to confirm | Is the body really HTML? If not, this stands |
-| Content-Type of a [JavaScript MIME type][mimesniff-js] | | LOW, to confirm | The cheat sheet: [application/json and not application/javascript][rest-ct-js]. Another site can run it with `<script src>` ([Cross-Site Script Inclusion][mdn-corp-xssi]). Is the body really JavaScript? If not, this stands |
+| Content-Type `text/html` | | LOW, to confirm | Is the body really HTML? If not, this stands. Settled by the pasted body (below) |
+| Content-Type of a [JavaScript MIME type][mimesniff-js] | | LOW, to confirm | The cheat sheet: [application/json and not application/javascript][rest-ct-js]. Another site can run it with `<script src>` ([Cross-Site Script Inclusion][mdn-corp-xssi]). Is the body really JavaScript? If not, this stands. Settled by the pasted body when it is JSON (below) |
 | Cache-Control | `no-store` | as in Web page mode: a check on whether the response carries a signed-in user's data | The cheat sheet asks for no-store, [not stored by private or shared caches][rest-cc], on every API response. *Deviation:* the tool asks for it where the response carries a user's data, as in Web page mode, because a cached public response exposes no one |
 | Strict-Transport-Security | as in Web page mode | as in Web page mode | Same rules, same severities |
 | X-Content-Type-Options | `nosniff` | as in Web page mode | Same rules |
 | X-Frame-Options | `DENY` | **LOW** | [Still recommended for browsers without CSP Level 2][rest-xfo]. `SAMEORIGIN` is LOW: [no API response needs framing][rest-fa]. *Deviation:* the OWASP HTTP Headers Cheat Sheet says it [does not provide any security][cs-xfo-api] on a JSON API; the REST Security Cheat Sheet, the reference for this mode, still recommends it. Next to a `frame-ancestors` that lets any site frame the response, a note says browsers [ignore this header][csp3-fa-xfo], as in Web page mode |
+
+**The body, when it is pasted.** The checks on `text/html` and on a JavaScript
+type ask what the body is, and the text after the headers often answers.
+[The type must match the actual content][asvs-4.1.1], so only two plain answers
+are read, and nothing else in the body:
+
+| Body | `text/html` | JavaScript type |
+|---|---|---|
+| An object or array that parses as JSON | **LOW**, settled | **LOW**, settled |
+| A document opening with `<!doctype html>` or `<html>` | OK | to confirm |
+| No body, a fragment, compressed bytes, anything else | to confirm | to confirm |
+
+JSON is also valid JavaScript, so no body proves a JavaScript type right: that
+case stays with the analyst. Web page mode does not read the body.
 
 In this mode the CSP is read for two directives only: `frame-ancestors` (above)
 and `default-src` (below). [Most of what a CSP does only affects pages rendered
@@ -730,7 +755,9 @@ with the passage highlighted.
 - `fetch-mime`: [WHATWG Fetch Standard][fetch-mime]: “To extract a MIME type from a header list headers, run these steps. They return failure or a MIME type.”
 - `fetch-nosniff`: [WHATWG Fetch Standard][fetch-nosniff]: “If values[0] is an ASCII case-insensitive match for "nosniff", then return true.”
 - `geolocation-default`: [W3C Geolocation][geolocation-default]: “This specification defines a policy-controlled feature identified by the token string "geolocation". Its default allowlist is 'self'.”
+- `hstspreload-base`: [hstspreload.org][hstspreload-base]: “Serve an HSTS header on the base domain for HTTPS requests”
 - `hstspreload-min`: [hstspreload.org][hstspreload-min]: “The max-age must be at least 31536000 seconds (1 year).”
+- `hstspreload-subdomains`: [hstspreload.org][hstspreload-subdomains]: “HSTS preloading applies to all subdomains, including internal subdomains that are not publicly accessible.”
 - `hstspreload-token`: [hstspreload.org][hstspreload-token]: “If a site sends the preload directive in an HSTS header, it is considered to be requesting inclusion in the preload list and may be submitted via the form on this site.”
 - `html-charset-1024`: [WHATWG HTML Standard, Parsing][html-charset-1024]: “The authoring conformance requirements for character encoding declarations limit them to only appearing in the first 1024 bytes.”
 - `html-charset-transport`: [WHATWG HTML Standard, Parsing][html-charset-transport]: “If the transport layer specifies a character encoding, and it is supported, return that encoding with the confidence certain.”
@@ -988,7 +1015,9 @@ with the passage highlighted.
 [fetch-mime]: https://fetch.spec.whatwg.org/#:~:text=To%20extract%20a%20MIME%20type%20from%20a%20header%20list%20headers%2C%20run%20these%20steps.%20They%20return%20failure%20or%20a%20MIME%20type.
 [fetch-nosniff]: https://fetch.spec.whatwg.org/#:~:text=If%20values%5B0%5D%20is%20an%20ASCII%20case%2Dinsensitive%20match%20for%20%22nosniff%22%2C%20then%20return%20true.
 [geolocation-default]: https://www.w3.org/TR/geolocation/#:~:text=This%20specification%20defines%20a%20policy%2Dcontrolled%20feature%20identified%20by%20the%20token%20string%20%22geolocation%22.%20Its%20default%20allowlist%20is%20'self'.
+[hstspreload-base]: https://hstspreload.org/#:~:text=Serve%20an%20HSTS%20header%20on%20the%20base%20domain%20for%20HTTPS%20requests
 [hstspreload-min]: https://hstspreload.org/#:~:text=The%20max%2Dage%20must%20be%20at%20least%2031536000%20seconds%20(1%20year).
+[hstspreload-subdomains]: https://hstspreload.org/#:~:text=HSTS%20preloading%20applies%20to%20all%20subdomains%2C%20including%20internal%20subdomains%20that%20are%20not%20publicly%20accessible.
 [hstspreload-token]: https://hstspreload.org/#:~:text=If%20a%20site%20sends%20the,the%20form%20on%20this%20site.
 [html-charset-1024]: https://html.spec.whatwg.org/multipage/parsing.html#:~:text=The%20authoring%20conformance%20requirements%20for%20character%20encoding%20declarations%20limit%20them%20to%20only%20appearing%20in%20the%20first%201024%20bytes.
 [html-charset-transport]: https://html.spec.whatwg.org/multipage/parsing.html#:~:text=If%20the%20transport%20layer%20specifies%20a%20character%20encoding%2C%20and%20it%20is%20supported%2C%20return%20that%20encoding%20with%20the%20confidence%20certain.

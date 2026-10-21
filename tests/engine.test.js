@@ -459,3 +459,63 @@ test('X-DNS-Prefetch-Control asks about both OWASP conditions', () => {
   assert.ok(f.verify.includes('input from users'));             // where HTML injection happens
   assert.ok(f.verify.startsWith('Does the page show'));        // Web page mode: it is a page
 });
+
+test('Referrer-Policy origin and origin-when-cross-origin are settled', () => {
+  for (const v of ['origin', 'origin-when-cross-origin']) {
+    const f = analyze(`HTTP/1.1 200 OK\r\nReferrer-Policy: ${v}\r\n\r\n`, 'basic').results.find((r) => r.key === 'referrer-policy').findings[0];
+    assert.equal(f.severity, S.LOW, v);
+    assert.equal(f.verify, '', v);
+    assert.ok(f.recommendation.includes(`strict-${v}`), v);
+  }
+});
+
+test('decisions: a confirmed finding is settled and marked, an excluded one is dropped', () => {
+  const r = analyze('HTTP/1.1 200 OK\r\nStrict-Transport-Security: max-age=1\r\nCache-Control: max-age=600\r\n\r\n', 'extended');
+  const keyOf = (name, test) => {
+    const res = r.results.find((x) => x.name === name);
+    const i = res.findings.findIndex((f) => HL.models.isContingent(f) && test(f));
+    assert.ok(i >= 0, name);
+    return HL.engine.decisionKey(res, i);
+  };
+  const decisions = new Map([
+    [keyOf('Cache-Control', () => true), 'confirmed'],
+    [keyOf('Strict-Transport-Security', (f) => /preload/i.test(f.brief)), 'excluded'],
+  ]);
+  const before = JSON.stringify(r);
+  const v = HL.engine.resolve(r, decisions);
+  assert.equal(JSON.stringify(r), before);                                     // the report itself is untouched
+  const texts = findingList(v).map((l) => l.text);
+  assert.ok(texts.includes('Cache-Control: Misconfigured. Shared caches may store the response.'));
+  assert.ok(texts.some((t) => t.startsWith('Strict-Transport-Security:') && !t.includes('preload')));
+  assert.ok(findingList(v, { show: 'confirmed' }).some((l) => l.header === 'Cache-Control'));
+  assert.ok(!findingList(v, { show: 'toConfirm' }).some((l) => l.header === 'Cache-Control'));
+  assert.ok(!HL.models.resultIsContingent(v.results.find((x) => x.name === 'Cache-Control')));
+  // A decision on a settled finding is ignored; an unknown one throws.
+  const hsts = r.results.find((x) => x.name === 'Strict-Transport-Security');
+  const settled = hsts.findings.findIndex((f) => f.severity > 0 && !HL.models.isContingent(f));
+  assert.deepEqual(HL.engine.resolve(r, new Map([[HL.engine.decisionKey(hsts, settled), 'excluded']])).results, r.results);
+  assert.throws(() => HL.engine.resolve(r, new Map([[keyOf('Cache-Control', () => true), 'maybe']])));
+  assert.equal(HL.engine.resolve(r, new Map()), r);
+});
+
+test('REST Content-Type: the pasted body settles HTML and JavaScript declarations', () => {
+  const ct = (type, body) => analyze(`HTTP/1.1 200 OK\r\nContent-Type: ${type}\r\n\r\n${body}`, 'basic', 'api')
+    .results.find((r) => r.key === 'content-type').findings[0];
+  const json = '{"user":"mario","items":[1,2]}';
+  for (const type of ['text/html', 'text/html; charset=utf-8', 'application/javascript', 'text/javascript']) {
+    const f = ct(type, json);
+    assert.equal(f.severity, S.LOW, type);
+    assert.equal(f.verify, '', type);
+    assert.match(f.recommendation, /application\/json/, type);
+    assert.match(f.title, /JSON body/, type);
+    // No body, a fragment, or text that is not JSON: still to confirm.
+    for (const body of ['', '<div>hi</div>', '{not json', 'gibberish']) assert.notEqual(ct(type, body).verify, '', `${type} ${body}`);
+  }
+  assert.equal(ct('text/html', '\r\n<!DOCTYPE html>\r\n<html><body>Error</body></html>').severity, S.OK);
+  assert.equal(ct('text/html', '<html lang="en">').severity, S.OK);
+  assert.notEqual(ct('application/javascript', '<!doctype html>').verify, '');   // HTML is not a script either: left to the analyst
+  assert.equal(ct('application/json', json).severity, S.OK);
+  // Page mode never reads the body.
+  const page = analyze(`HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n${json}`, 'basic', 'page').results.find((r) => r.key === 'content-type');
+  assert.match(page.findings[0].title, /without a charset/);
+});

@@ -295,14 +295,15 @@ test('the extended profile holds exactly its 25 headers', () => {
 // ------------------------------------------------------------------ Content-Type charset
 const charsetOf = (value) => resultFor('Content-Type', value).findings;
 
-test('Content-Type: HTML without a charset is LOW, to confirm against <meta charset>', () => {
+test('Content-Type: HTML without a charset is LOW, settled: a <meta charset> does not replace the header', () => {
   for (const v of ['text/html', 'TEXT/HTML', 'text/html; charset=', 'text/html; charset=""', 'text/html; boundary=x']) {
     const fs = charsetOf(v);
     assert.equal(fs.length, 1, v);
     assert.equal(fs[0].severity, S.LOW, v);
     assert.equal(fs[0].status, HL.models.Status.MISCONFIGURED, v);
-    assert.match(fs[0].verify, /meta charset/, v);
-    assert.equal(fs[0].recommendation, '', v);
+    assert.equal(fs[0].verify, '', v);
+    assert.match(fs[0].recommendation, /charset=utf-8/, v);
+    assert.match(fs[0].description, /meta charset/, v);
   }
 });
 
@@ -327,7 +328,7 @@ test('Content-Type: a charset browsers do not recognise counts as no charset', (
     assert.equal(fs.length, 1, v);
     assert.equal(fs[0].severity, S.LOW, v);
     assert.match(fs[0].brief, /Unrecognised charset/, v);
-    assert.match(fs[0].verify, /meta charset/, v);
+    assert.equal(fs[0].verify, '', v);
   }
   // Labels from the WHATWG Encoding Standard, matched without case.
   for (const v of ['UTF8', 'latin1', 'Shift_JIS', 'iso-2022-jp', 'utf-16le', 'x-user-defined', 'unicode-1-1-utf-8', 'csiso2022kr']) {

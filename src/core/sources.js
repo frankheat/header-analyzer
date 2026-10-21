@@ -324,6 +324,8 @@
     'adobe-invalid': ['adobe', 'An invalid meta-policy was specified in an X-Permitted-Cross-Domain-Policies HTTP header. It has been ignored.'],
     'ie8-xdo': ['ie8', 'When the new X-Download-Options header is present with the value noopen, the user is prevented from opening a file download directly'],
     'ie-end': ['ieEnd', 'On June 15, 2022, the Internet Explorer 11 (IE11) desktop application ended support'],
+    'hstspreload-base': ['hstspreload', 'Serve an HSTS header on the base domain for HTTPS requests'],
+    'hstspreload-subdomains': ['hstspreload', 'HSTS preloading applies to all subdomains, including internal subdomains that are not publicly accessible.'],
     'hstspreload-min': ['hstspreload', 'The max-age must be at least 31536000 seconds (1 year).'],
     'hstspreload-token': ['hstspreload', 'If a site sends the preload directive in an HSTS header, it is considered to be requesting inclusion in the preload list and may be submitted via the form on this site.'],
     'sonar-detect': ['sonar', 'A single occurrence of one of these escape sequences is usually enough to convince the auto-detection algorithm that the HTTP response body is encoded with ISO-2022-JP.'],

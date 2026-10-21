@@ -531,3 +531,9 @@ svg { fill: currentColor; }
   .layout { display: block; padding: 0; }
   .row-detail { display: flex !important; }
 }
+
+/* Decision on a finding to confirm */
+.filter-chip[aria-pressed="true"] { padding-left: 8px; border-color: transparent; background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
+.filter-chip[aria-pressed="true"] .chip-check { display: block; color: var(--md-primary); }
+.finding.decided-excluded :is(.finding-head, .finding-desc, .callout) { opacity: 0.6; }
+.finding.decided-excluded .finding-title { text-decoration: line-through; }

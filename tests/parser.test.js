@@ -131,3 +131,9 @@ test('input over the size limit is refused, not processed', () => {
 test('replacement characters from invalid UTF-8 are tolerated', () => {
   assert.ok(headersOf('HTTP/1.1 200 OK\r\nX-Weird: ��\r\n\r\n')['x-weird']);
 });
+
+test('the body after the headers is kept as text', () => {
+  const p = HL.parser.parseResponse('HTTP/1.1 200 OK\r\nA: b\r\n\r\n{"x":1}\r\nHTTP/1.1 200 OK');
+  assert.equal(p.response.body, '{"x":1}\nHTTP/1.1 200 OK');
+  assert.equal(HL.parser.parseResponse('HTTP/1.1 200 OK\r\nA: b').response.body, '');
+});

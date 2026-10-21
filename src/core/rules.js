@@ -201,17 +201,19 @@
     // Both branches are contingent on the same lookup: the token declares
     // intent, and membership of the list is a separate step.
     if (cfg.requirePreload) {
-      const listed = 'Is the domain on the preload list? Check hstspreload.org. If it is, there is nothing here. If it is not, ';
+      // The list entry is for the base domain and covers its subdomains, so a
+      // subdomain's own header need not carry the token.
+      const listed = 'Is the domain, or its base domain (example.com for api.example.com), on the preload list? Check hstspreload.org. If it is, there is nothing here. If it is not, ';
       if (!directives.has('preload')) {
         findings.push(finding(HSTS, Severity.LOW, 'HSTS: preload is not declared', {
-          sources: ['cs-hsts-rec', 'hstspreload-token'],
+          sources: ['cs-hsts-rec', 'hstspreload-token', 'hstspreload-base', 'hstspreload-subdomains'],
           brief: 'preload is not set',
           description: 'Preloading is what closes the one gap HSTS cannot close on its own: the first request to this domain, made before the browser has ever seen the site, goes out over plain HTTP and can be stripped by anyone on the network path.',
           verify: listed + 'this stands. Preloading is also hard to undo and covers every subdomain, so a site may have declined it deliberately: that is a decision to record, not a defect to report.',
         }));
       } else {
         findings.push(finding(HSTS, Severity.LOW, 'HSTS: preload is declared, which is not the same as being on the list', {
-          sources: ['hstspreload-token'],
+          sources: ['hstspreload-token', 'hstspreload-base', 'hstspreload-subdomains'],
           brief: 'preload is declared but list membership is unverified',
           description: 'The token is what a domain must send to be accepted, not what puts it there: submission at hstspreload.org is a separate step, and it can be refused or reversed. A domain can carry this token for years without ever being listed.',
           verify: listed + 'the first-visit protection this header looks like it provides does not exist, and the site is exactly where it would be without the token.',
@@ -592,8 +594,8 @@
       return [finding(RP, Severity.LOW, `Referrer-Policy: '${n}' (sends the origin to plain-HTTP destinations too)`, {
         sources: ['cs-rp-default', 'asvs-3.4.5'],
         brief: `${n} sends the origin over plain HTTP`,
-        description: 'Only the origin is sent, never the path or query, but it reaches destinations that are not TLS-protected as well, where anyone on the network path reads which site the user is on. The strict- variants are identical except that they withhold it on such a downgrade.',
-        verify: 'Does the page link to, or load anything from, a plain-HTTP destination? If it does, the origin reaches whoever is on the network path and this stands. If it does not, nothing leaks today, but the strict- variants behave identically over HTTPS, so they give up strictly less for nothing in return and the change is free either way.',
+        description: 'Only the origin is sent, never the path or query, but it reaches destinations that are not TLS-protected as well, where anyone on the network path reads which site the user is on. The strict- variants are identical except that they withhold it on such a downgrade, so they cost nothing; this value is also weaker than the strict-origin-when-cross-origin browsers apply when the header is absent.',
+        recommendation: `Use the strict- variant, strict-${n}: it sends the same origin over HTTPS and nothing over plain HTTP.`,
       })];
     }
     if (n === 'no-referrer-when-downgrade' || n === 'unsafe-url') {
@@ -823,7 +825,10 @@
   // OWASP Cheat Sheet: "the charset attribute is necessary to prevent XSS in
   // HTML pages". Without it browsers detect the encoding, and an injected
   // ISO-2022-JP escape sequence is enough to change it (Sonar, 2024).
-  const CHARSET_VERIFY = 'Does the HTML declare its encoding itself, with <meta charset="utf-8"> within its first 1024 bytes, or start with a UTF-8 byte order mark? If it does, there is nothing here. If it does not, this stands: set Content-Type: text/html; charset=utf-8.';
+  // A <meta charset> in the page does not settle it: the header is what OWASP
+  // asks for, and the only declaration the browser takes as certain.
+  const CHARSET_META = ' A <meta charset> in the page can also set the encoding, but only if it sits in the first 1024 bytes, and it is read from the page itself; the header is what the browser takes as certain before reading a byte of it.';
+  const CHARSET_REC = 'Set Content-Type: text/html; charset=utf-8.';
 
   // Every label the WHATWG Encoding Standard defines (encodings.json), all 228.
   // A charset that is not one of them is ignored, exactly as if it were absent.
@@ -875,17 +880,17 @@
     }
     if (mime.charset !== null) {
       return [finding(H, Severity.LOW, `Content-Type: unrecognised charset '${mime.charset}'`, {
-        sources: ['encoding-label', 'html-charset-transport', 'cs-ct-charset', 'sonar-detect'],
+        sources: ['encoding-label', 'html-charset-transport', 'html-charset-1024', 'cs-ct-charset', 'sonar-detect'],
         brief: 'Unrecognised charset, so browsers ignore it',
-        description: `'${mime.charset}' is not an encoding name the WHATWG Encoding Standard defines, so browsers discard it and treat the page as if it declared no charset. ${CHARSET_RISK}`,
-        verify: CHARSET_VERIFY,
+        description: `'${mime.charset}' is not an encoding name the WHATWG Encoding Standard defines, so browsers discard it and treat the page as if it declared no charset. ${CHARSET_RISK}${CHARSET_META}`,
+        recommendation: CHARSET_REC,
       })];
     }
     return [finding(H, Severity.LOW, 'Content-Type: text/html without a charset', {
-      sources: ['cs-ct-charset', 'sonar-detect', 'html-charset-1024'],
+      sources: ['cs-ct-charset', 'sonar-detect', 'html-charset-transport', 'html-charset-1024'],
       brief: 'No charset declared',
-      description: CHARSET_RISK,
-      verify: CHARSET_VERIFY,
+      description: CHARSET_RISK + CHARSET_META,
+      recommendation: CHARSET_REC,
     })];
   }
 
@@ -1290,8 +1295,26 @@
     return page;
   }
 
-  function apiContentType(value, empty) {
+  const JS_TYPE_RISK = 'The response declares itself a script. Another site can include it with <script src>, and the browser runs it there with the user\'s cookies: data the script holds can be read by that site (Cross-Site Script Inclusion). A JSON type is not run that way.';
+
+  /**
+   * What the pasted body plainly is: 'json' for an object or array that parses
+   * as JSON, 'html' for a document that opens with a doctype or <html>, null
+   * for anything else (no body, a fragment, compressed bytes). Only these two
+   * answers settle a check; anything less certain leaves it to confirm.
+   */
+  function bodyKind(body) {
+    const text = String(body || '').replace(/^\uFEFF/, '').trim();
+    if (/^[[{]/.test(text)) {
+      try { JSON.parse(text); return 'json'; } catch (_) { return null; }
+    }
+    if (/^<!doctype\s+html[\s>]/i.test(text) || /^<html[\s>]/i.test(text)) return 'html';
+    return null;
+  }
+
+  function apiContentType(value, empty, ctx) {
     const H = 'Content-Type';
+    const kind = bodyKind(ctx && ctx.body);
     if (value === null) {
       return [finding(H, Severity.LOW, apiTitle(H, empty), {
         status: apiStatus(empty), brief: 'Browsers may guess the content type',
@@ -1309,6 +1332,17 @@
         sources: ['rest-ct-guess', 'fetch-mime', 'asvs-4.1.1'],
       })];
     }
+    if (mime.essence === 'text/html' && kind === 'html') {
+      return [finding(H, Severity.OK, 'Content-Type: text/html, and the body is an HTML document', { sources: ['rest-ct'] })];
+    }
+    if (mime.essence === 'text/html' && kind === 'json') {
+      return [finding(H, Severity.LOW, 'Content-Type: text/html on a JSON body', {
+        status: Status.MISCONFIGURED, brief: 'JSON declared as HTML',
+        description: 'The body is JSON, but the response declares itself HTML, so a browser that opens it renders it as a page, and anything injected into it can run as markup.',
+        recommendation: API_CT_REC,
+        sources: ['rest-ct', 'asvs-4.1.1'],
+      })];
+    }
     if (mime.essence === 'text/html') {
       return [finding(H, Severity.LOW, 'Content-Type: text/html on an API response', {
         status: Status.MISCONFIGURED, brief: 'Declared as HTML',
@@ -1317,10 +1351,18 @@
         sources: ['rest-ct', 'asvs-4.1.1'],
       })];
     }
+    if (JS_TYPES.has(mime.essence) && kind === 'json') {
+      return [finding(H, Severity.LOW, `Content-Type: ${mime.essence} on a JSON body`, {
+        status: Status.MISCONFIGURED, brief: 'JSON declared as JavaScript',
+        description: JS_TYPE_RISK.replace('The response declares itself a script.', 'The body is JSON, but the response declares itself a script.'),
+        recommendation: API_CT_REC,
+        sources: ['rest-ct-js', 'mimesniff-js', 'mdn-corp-xssi'],
+      })];
+    }
     if (JS_TYPES.has(mime.essence)) {
       return [finding(H, Severity.LOW, `Content-Type: ${mime.essence} on an API response`, {
         status: Status.MISCONFIGURED, brief: 'Declared as JavaScript',
-        description: 'The response declares itself a script. Another site can include it with <script src>, and the browser runs it there with the user\'s cookies: data the script holds can be read by that site (Cross-Site Script Inclusion). A JSON type is not run that way.',
+        description: JS_TYPE_RISK,
         verify: 'Is the body really JavaScript? If it is JSON or anything else, this stands: declare the type the API returns, such as application/json. If the body is a script, there is nothing here about the type itself.',
         sources: ['rest-ct-js', 'mimesniff-js', 'mdn-corp-xssi'],
       })];
@@ -1432,7 +1474,7 @@
     for (const [key, canonical, registryAbsent] of SECURITY_HEADERS) {
       if (!HL.profiles.inScope(key, profile, mode)) continue;
       if (api && (API_CHECKERS[key] || API_NOT_APPLICABLE[key])) {
-        results.push(apiResult(key, canonical, headers.get(key), profile, framingByCsp));
+        results.push(apiResult(key, canonical, headers.get(key), profile, framingByCsp, context && context.body));
         continue;
       }
       let absentSeverity = registryAbsent;
@@ -1503,7 +1545,7 @@
   }
 
   /** One header in REST API mode: duplicates resolved as in page mode, then judged as an API response. */
-  function apiResult(key, canonical, occurrences, profile, framingByCsp) {
+  function apiResult(key, canonical, occurrences, profile, framingByCsp, body) {
     const findings = [];
     let value = null;
     if (occurrences) {
@@ -1512,7 +1554,7 @@
       if (resolved.note) findings.push(resolved.note);
     }
     const empty = value !== null && value.trim() === '';
-    const ctx = { absentSeverity: Severity.LOW, hsts: profile.hsts };
+    const ctx = { absentSeverity: Severity.LOW, hsts: profile.hsts, body: body || '' };
     const check = API_CHECKERS[key] || apiNotApplicable(key, canonical);
     findings.push(...check(empty || value === null ? null : value, empty, ctx, framingByCsp));
     return { key, name: canonical, value, present: value !== null, findings };

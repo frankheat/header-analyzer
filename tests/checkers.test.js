@@ -203,6 +203,8 @@ for (const [value, title] of [
     assert.equal(f.severity, S.LOW);
     assert.ok(isContingent(f));
     assert.ok(f.verify.includes('hstspreload.org'));
+    assert.ok(f.verify.includes('its base domain'));          // a subdomain is covered by its base domain's entry
+    assert.ok(f.sources.includes('hstspreload-subdomains'));
   });
 }
 
@@ -536,9 +538,9 @@ test('Referrer-Policy: unrecognised value explains the fallback and tracks absen
 });
 
 for (const value of ['origin', 'origin-when-cross-origin']) {
-  test(`Referrer-Policy ${value} asks for a check`, () => {
+  test(`Referrer-Policy ${value} is settled, with the strict- variant as the fix`, () => {
     const f = findingsFor('Referrer-Policy', value)[0];
-    assert.ok(isIssue(f.severity) && isContingent(f) && f.verify.includes('plain-HTTP'));
+    assert.ok(isIssue(f.severity) && !isContingent(f) && f.recommendation.includes(`strict-${value}`));
   });
 }
 
