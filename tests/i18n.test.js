@@ -91,3 +91,18 @@ test('the interface has every key in both languages', () => {
   }
   for (const s of HL.samples) for (const lang of HL.i18n.LANGS) assert.ok(s.label[lang].name && s.label[lang].detail, `${s.id} ${lang}`);
 });
+
+test('the first visit follows the browser language; a saved choice wins', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'src/ui/app.js'), 'utf8');
+  const fn = src.slice(src.indexOf('  function initialLang()'), src.indexOf('  /** The engine in the current language. */'));
+  const initialLang = (language, languages, saved) => new Function('navigator', 'storage', 'HL', `${fn}; return initialLang();`)(
+    { language, languages }, { get: () => saved }, { i18n: HL.i18n });
+  assert.equal(initialLang('it-IT', ['en-US', 'en', 'it'], null), 'it');   // Chrome in Italian, English first for websites
+  assert.equal(initialLang('en-US', ['it-IT', 'en'], null), 'it');
+  assert.equal(initialLang('it', undefined, null), 'it');
+  assert.equal(initialLang('en-US', ['en-US'], null), 'en');
+  assert.equal(initialLang('fr-FR', ['fr-FR'], null), 'en');
+  assert.equal(initialLang('it-IT', ['it'], 'en'), 'en');
+  assert.equal(initialLang('en-US', ['en-US'], 'it'), 'it');
+  assert.equal(initialLang('it-IT', ['it'], 'xx'), 'it');                   // an unknown saved value is ignored
+});

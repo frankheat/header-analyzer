@@ -64,9 +64,10 @@
         </button>
         <div class="menu" id="samples-menu" role="menu" aria-labelledby="samples-button" hidden></div>
       </div>
-      <button type="button" class="icon-button lang-toggle" id="lang-button" title="Passa all'italiano" aria-label="Passa all'italiano">
-        <span class="lang-code" aria-hidden="true">IT</span>
-      </button>
+      <div class="segmented lang-switch" role="radiogroup" aria-label="Language" data-i18n-attr="aria-label:language" id="lang-control">
+        <button type="button" role="radio" data-lang="en" lang="en" title="English" aria-checked="true">EN</button>
+        <button type="button" role="radio" data-lang="it" lang="it" title="Italiano" aria-checked="false">IT</button>
+      </div>
       <button type="button" class="icon-button theme-toggle" id="theme-button" title="Switch to dark theme" aria-label="Switch to dark theme">
         <svg class="ic-dark" aria-hidden="true"><use href="#i-dark"></use></svg>
         <svg class="ic-light" aria-hidden="true"><use href="#i-light"></use></svg>

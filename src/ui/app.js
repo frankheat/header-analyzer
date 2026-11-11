@@ -89,7 +89,7 @@
 
   const UI_TEXT = {
     en: {
-      langButton: 'IT', langSwitch: 'Passa all\'italiano',
+      language: 'Language',
       skip: 'Skip to results', profile: 'Profile', basic: 'Basic', extended: 'Extended',
       responseType: 'Response type', webPage: 'Web page', restApi: 'REST API', actions: 'Actions',
       samples: 'Samples', loadSample: 'Load a sample response', response: 'Response', pasteRaw: 'Paste a raw HTTP response',
@@ -129,7 +129,7 @@
       crashed: 'Something went wrong in Header Analyzer. Reload the page if it misbehaves.',
     },
     it: {
-      langButton: 'EN', langSwitch: 'Switch to English',
+      language: 'Lingua',
       skip: 'Vai ai risultati', profile: 'Profilo', basic: 'Base', extended: 'Esteso',
       responseType: 'Tipo di risposta', webPage: 'Pagina web', restApi: 'REST API', actions: 'Azioni',
       samples: 'Esempi', loadSample: 'Carica una risposta di esempio', response: 'Risposta', pasteRaw: 'Incolla una risposta HTTP grezza',
@@ -176,12 +176,16 @@
     return typeof v === 'function' ? v(...args) : v;
   }
 
-  /** A saved choice wins; without one, Italian for an Italian browser and English otherwise. */
+  /**
+   * A saved choice wins; without one, Italian for an Italian browser and
+   * English otherwise. navigator.language is the browser's own language (in
+   * Chrome it can differ from the first language preferred for websites).
+   */
   function initialLang() {
     const saved = storage.get('lang');
     if (HL.i18n.LANGS.includes(saved)) return saved;
-    const nav = (navigator.languages && navigator.languages[0]) || navigator.language || '';
-    return /^it\b/i.test(nav) ? 'it' : HL.i18n.DEFAULT_LANG;
+    const browser = [navigator.language, navigator.languages && navigator.languages[0]];
+    return browser.some((l) => /^it\b/i.test(l || '')) ? 'it' : HL.i18n.DEFAULT_LANG;
   }
 
   /** The engine in the current language. */
@@ -746,10 +750,11 @@
         if (attr && key) n.setAttribute(attr, tr(key));
       }
     }
-    const b = $('lang-button');
-    b.querySelector('.lang-code').textContent = tr('langButton');
-    b.setAttribute('aria-label', tr('langSwitch'));
-    b.title = tr('langSwitch');
+    for (const b of document.querySelectorAll('#lang-control [data-lang]')) {
+      const on = b.dataset.lang === state.lang;
+      b.setAttribute('aria-checked', String(on));
+      b.tabIndex = on ? 0 : -1;
+    }
     applyTheme();
     applyProfile();
     applyMode();
@@ -757,6 +762,7 @@
   }
 
   function setLang(lang) {
+    if (lang === state.lang) return;
     state.lang = HL.i18n.LANGS.includes(lang) ? lang : HL.i18n.DEFAULT_LANG;
     storage.set('lang', state.lang);
     applyLanguage();
@@ -785,7 +791,7 @@
         loadText(s.text);
       }
     });
-    $('lang-button').addEventListener('click', () => setLang(state.lang === 'it' ? 'en' : 'it'));
+    initSegmented($('lang-control'), (b) => setLang(b.dataset.lang));
     $('theme-button').addEventListener('click', () => {
       storage.set('theme', currentTheme() === 'dark' ? 'light' : 'dark');
       applyTheme();
@@ -829,6 +835,9 @@
     runAnalysis(true);
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-  else init();
+  // This script comes last in the body, so the page it fills is already
+  // parsed: running now, rather than at DOMContentLoaded, puts the chosen
+  // language on screen before the first paint.
+  if ($('results-root')) init();
+  else document.addEventListener('DOMContentLoaded', init);
 })(globalThis.HeaderAnalyzer = globalThis.HeaderAnalyzer || {});
