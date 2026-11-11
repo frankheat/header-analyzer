@@ -116,7 +116,7 @@ test('the extended profile checks more headers, asks about preload and expects D
   const ext = analyze(['X-Nothing: x'], PROFILES.extended);
   assert.ok(Object.keys(basic).every((k) => k in ext));
   assert.ok(Object.keys(ext).length > Object.keys(basic).length);
-  assert.ok(has(findingsFor('Strict-Transport-Security', 'max-age=63072000; includeSubDomains', PROFILES.extended), 'preload is not declared'));
+  assert.ok(has(findingsFor('Strict-Transport-Security', 'max-age=63072000; includeSubDomains', PROFILES.extended), 'preload list membership not verified'));
   assert.equal(worstSeverity(ext['x-dns-prefetch-control']), S.LOW);
   assert.equal(worstSeverity(basic['x-dns-prefetch-control']), S.LOW);
 });
@@ -226,8 +226,8 @@ test('a specific origin with credentials is LOW: OWASP recommends it, reflection
   const r = cors('https://app.example.com');
   assert.equal(worstSeverity(r), S.LOW);
   const f = r.findings.find((x) => x.severity === S.LOW);
-  assert.ok(isContingent(f) && f.description.includes('echoes back') && f.verify.includes('does not come back'));
-  assert.ok(f.verify.includes('it is HIGH'));                  // the worst case is stated in the check
+  assert.ok(isContingent(f) && f.description.includes('echoes back') && f.verify.includes('attacker.example'));
+  assert.ok(f.confirmIf.includes('it is HIGH'));               // the worst case is stated in the check
 });
 
 test('credentials without an origin, or with an unusable one, have no effect', () => {

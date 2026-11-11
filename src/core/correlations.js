@@ -10,7 +10,7 @@
 (function (HL) {
   'use strict';
 
-  const { Severity, Status, finding } = HL.models;
+  const { Severity, Status, finding, check } = HL.models;
   const { PERMISSIVE_FRAME_ANCESTORS } = HL.csp;
 
   const ACAO = 'access-control-allow-origin';
@@ -95,10 +95,10 @@
     // Headers Project recommends; what the response cannot show is whether the
     // origin is allowlisted or mirrored, and that is the check.
     return make(Severity.LOW, `Authenticated cross-origin access is granted to ${origin}`, {
-      sources: ['bp-cors-auth', 'bp-cors-mirror', 'zap-cors-risk'],
+      sources: ['bp-cors-auth', 'bp-cors-mirror', 'zap-cors-risk', 'ps-url-bypass'],
       brief: `Credentials allowed for ${origin}, possibly reflected`,
       description: `This response lets ${origin} read data using the user's cookies. A fixed, allowlisted origin with credentials is the configuration OWASP recommends for authenticated CORS. A server that echoes back the request's Origin header produces exactly the same bytes, though, and then any site can read this endpoint as the logged-in user. A single saved response cannot tell the two apart.`,
-      verify: 'Replay the request with Origin: https://an-origin-you-made-up.example. If it comes back in Access-Control-Allow-Origin, the server reflects whatever it is sent and any site reads this endpoint as the logged-in user: this stands, and it is HIGH. If it does not come back, the allowlist is real, this is correct authenticated CORS, and there is nothing here.',
+      ...check(HL.rules.REFLECTION_REPLAY, 'the response allows any of these origins in Access-Control-Allow-Origin: any site then reads this endpoint as the logged-in user, and it is HIGH', `every attempt still gets ${origin}, or no Access-Control-Allow-Origin`),
     });
   }
 

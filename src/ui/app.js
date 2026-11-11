@@ -508,7 +508,7 @@
     if (f.verify) {
       const label = note ? 'Check' : DECISION_LABEL[decision] || 'To confirm';
       node.append(el('div', { className: 'callout verify' }, icon(decision === 'confirmed' ? 'i-check' : 'i-help'),
-        el('div', null, el('span', { className: 'callout-label', text: label }), f.verify)));
+        el('div', null, el('span', { className: 'callout-label', text: label }), el('p', { className: 'check-question', text: f.verify }), outcomes(f, note))));
     }
     if (contingent) node.append(decisionChips(key, decision));
     if (f.recommendation) {
@@ -517,6 +517,19 @@
     }
     if (f.sources.length) node.append(sourcesNode(f.sources));
     return node;
+  }
+
+  /**
+   * The two answers to a check, one per line. On a finding to confirm they
+   * read as the buttons below it; on an OK note, the problem a check would
+   * show and its absence.
+   */
+  function outcomes(f, note) {
+    const rows = note
+      ? [['i-check', 'Fine if', f.excludeIf], ['i-close', 'Problem if', f.confirmIf]]
+      : [['i-check', 'Confirmed if', f.confirmIf], ['i-close', 'Excluded if', f.excludeIf]];
+    return el('ul', { className: 'check-outcomes' }, rows.filter(([, , text]) => text).map(([ic, label, text]) =>
+      el('li', null, icon(ic), el('span', null, el('strong', { text: `${label}: ` }), text))));
   }
 
   /** Two toggles under a finding to confirm; pressing the active one again reopens it. */

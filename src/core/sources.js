@@ -85,6 +85,7 @@
     psCache: ['PortSwigger, Cacheable HTTPS response', 'https://portswigger.net/kb/issues/00700100_cacheable-https-response'],
     psBlindCss: ['PortSwigger Research, Blind CSS Exfiltration', 'https://portswigger.net/research/blind-css-exfiltration'],
     psReferer: ['PortSwigger, Cross-domain Referer leakage', 'https://portswigger.net/kb/issues/00500400_cross-domain-referer-leakage'],
+    psUrlBypass: ['PortSwigger, URL validation bypass cheat sheet', 'https://portswigger.net/web-security/ssrf/url-validation-bypass-cheat-sheet'],
   };
 
   // ZAP alert pages: [alert id, alert name]; each is cited for its risk rating.
@@ -382,6 +383,7 @@
     'mdn-xpcdp-none': ['mdnXpcdp', 'No policy files are allowed anywhere on the target server, including in a master policy file.'],
     'mdn-xpcdp-ntr': ['mdnXpcdp', 'Indicates that the current document should not be used as a policy file despite other headers or its content.'],
     'mdn-xpcdp': ['mdnXpcdp', 'Some security testing tools will still check for the presence of a X-Permitted-Cross-Domain-Policies: none header because it can mitigate the risk of an overly-permissive policy file added to your site by accident or through malicious actions.'],
+    'ps-url-bypass': ['psUrlBypass', 'These wordlists are useful for attacks such as server-side request forgery, CORS misconfigurations, and open redirection.'],
     'ps-cors-http': ['psCorsHttp', 'If a site allows interaction from an origin that uses unencrypted HTTP communications, then it is vulnerable to an attacker who is in a position to view and modify a user\'s unencrypted network traffic.'],
     'ps-css-csp': ['psBlindCss', 'Imagine you\'ve got a blind HTML injection vulnerability but you can\'t get XSS because of the site\'s CSP'],
     'ps-css-attr': ['psBlindCss', 'Attribute selectors are an extremely powerful way to extract data.'],

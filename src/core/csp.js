@@ -20,7 +20,7 @@
 (function (HL) {
   'use strict';
 
-  const { Severity, Status, finding } = HL.models;
+  const { Severity, Status, finding, check } = HL.models;
   const H = 'Content-Security-Policy';
 
   // Every directive a current browser acts on.
@@ -409,7 +409,7 @@
         sources: ['csp3-nonce-unique'],
         status: Status.NONE,
         description: 'A nonce works only if an attacker cannot know it in advance. One that is fixed, cached with the page, or reused across responses can be copied straight into an injected <script nonce=…>, and the policy then allows the injection: no better than \'unsafe-inline\'. One saved response cannot show which it is.',
-        verify: 'Request the same URL twice (with any cache bypassed) and compare the nonce values. If they differ, there is nothing here. If they are the same, this stands: the nonce is predictable and the policy can be bypassed by anyone who has seen it.',
+        ...check('Request the same URL twice (with any cache bypassed) and compare the nonce values.', 'they are the same', 'they differ'),
       });
     }
 

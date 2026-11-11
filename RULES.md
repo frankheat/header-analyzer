@@ -193,7 +193,7 @@ selected, to copy by hand.
 | X-Permitted-Cross-Domain-Policies | **LOW** | OWASP [recommends `none`][bp-xpcdp]; without it Adobe clients [still consult a policy file][adobe-default] |
 | Cache-Control | **LOW**, to confirm | [ZAP 10015][zap-10015] and [PortSwigger][ps-cache]: Informational; [ASVS 14.3.2][asvs-14.3.2] (L2) for sensitive data: whether it is sensitive is the check |
 | Clear-Site-Data | **LOW**, to confirm | [ASVS 14.3.1][asvs-14.3.1]; OWASP: [on the logout function][bp-csd-logout]. Only a session-ending response needs it, which is the check |
-| X-DNS-Prefetch-Control | **LOW**, to confirm | The check asks both OWASP conditions: [links to domains you do not control][cs-xdns] (Cheat Sheet), or a response that [returns sensitive or private content][bp-xdns-pii] or is [prone to HTML injection][bp-xdns-inj] (Secure Headers Project) |
+| X-DNS-Prefetch-Control | **LOW**, to confirm | The check asks for an external link ([Cheat Sheet][cs-xdns]) or an HTML injection ([Secure Headers Project][bp-xdns-inj]); sensitive content alone is left out, a deviation (see below) |
 | Origin-Agent-Cluster (Extended) | **LOW** | An available isolation opt-in left unused: [`?1` stops this page relaxing its origin with document.domain][mdn-docdomain-oac], which [same-site pages on other subdomains can abuse][mdn-docdomain-shared]. Chrome and Edge [already block it by default][chrome-docdomain-115]; MDN warns the process separation [is not a security feature][mdn-oac-hint] |
 | Service-Worker-Allowed (Extended) | OK | Absence keeps the [path restriction][sw-allowed]: the safest state |
 | Content-Disposition (Extended) | OK | Only needed [on downloads][cs-download] |
@@ -285,7 +285,7 @@ Absent: **MEDIUM**. RFC 6797 §6.1.
 | `max-age=0` | **MEDIUM** | [Deletes the policy][rfc6797-zero]: as absent. *Deviation:* [ZAP 10035-2 Low][zap-10035-2] |
 | max-age below the 2-year profile minimum | LOW | [ASVS 3.4.1 asks ≥ 1 year][asvs-3.4.1], [OWASP Cheat Sheet 2 years][cs-hsts-rec], [hstspreload.org 1 year][hstspreload-min]; [Observatory −10 only below 6 months][obs-hsts-short] |
 | No includeSubDomains | LOW | [ASVS 3.4.1 from L2][asvs-3.4.1]; [OWASP][bp-hsts] |
-| Extended: preload not declared, or declared | LOW, to confirm | [OWASP Cheat Sheet recommends preload][cs-hsts-rec]; [the token only requests inclusion][hstspreload-token], so list membership is the check. The header must be [served on the base domain][hstspreload-base] and [preloading covers all subdomains][hstspreload-subdomains], so on a subdomain the check is the base domain's entry (example.com for api.example.com): a subdomain's own header need not carry the token |
+| Extended: preload not declared, or declared (one finding: list membership not verified) | LOW, to confirm | [OWASP Cheat Sheet recommends preload][cs-hsts-rec]; [the token only requests inclusion][hstspreload-token], so list membership is the check. The header must be [served on the base domain][hstspreload-base] and [preloading covers all subdomains][hstspreload-subdomains], so on a subdomain the check is the base domain's entry (example.com for api.example.com): a subdomain's own header need not carry the token |
 
 ## X-Frame-Options
 
@@ -410,10 +410,17 @@ Absent: **LOW**.
 Absent: **LOW**, to confirm, in both profiles. The header is [not
 standard][cs-xdns-nonstd] ([MDN][mdn-xdns-nonstd]).
 
-The check asks whether the page shows any of the OWASP conditions: [links to
-sites you do not control][cs-xdns], [sensitive or personal data][bp-xdns-pii],
-or input from users, which is what makes it [prone to HTML
-injection][bp-xdns-inj]. Any of them: the finding stands. None: nothing here.
+The check asks whether the page has links to external sites ([links you do
+not control][cs-xdns], including links made from what users write) or an HTML
+injection ([prone to HTML injection][bp-xdns-inj]). Either: the finding
+stands. Neither: nothing here.
+
+**Deviation.** The Secure Headers Project also asks for the header on a
+response that [returns sensitive or private content][bp-xdns-pii], and on any
+page prone to injection, as a precaution. The check leaves out personal data
+on its own, and user content the page escapes: prefetching only adds lookups
+for links a page carries or an injection adds, so without either there is no
+channel for the data to leave by.
 
 | Condition | Severity |
 |---|---|
@@ -833,6 +840,7 @@ with the passage highlighted.
 - `ps-css-csp`: [PortSwigger Research, Blind CSS Exfiltration][ps-css-csp]: “Imagine you've got a blind HTML injection vulnerability but you can't get XSS because of the site's CSP”
 - `ps-hsts`: [PortSwigger, Strict transport security not enforced][ps-hsts]: “Typical severity: Low”
 - `ps-referer`: [PortSwigger, Cross-domain Referer leakage][ps-referer]: “Typical severity: Information”
+- `ps-url-bypass`: [PortSwigger, URL validation bypass cheat sheet][ps-url-bypass]: “These wordlists are useful for attacks such as server-side request forgery, CORS misconfigurations, and open redirection.”
 - `referrer-last`: [W3C Referrer Policy][referrer-last]: “For each token in policy-tokens, if token is a referrer policy and token is not the empty string, then set policy to token.”
 - `rest-cc`: [OWASP REST Security Cheat Sheet][rest-cc]: “Instructs compliant private and shared HTTP caches not to store the response or reuse it for another request”
 - `rest-cors`: [OWASP REST Security Cheat Sheet][rest-cors]: “Be as specific as possible and as general as necessary when setting the origins of cross-domain calls.”
@@ -1096,6 +1104,7 @@ with the passage highlighted.
 [ps-css-csp]: https://portswigger.net/research/blind-css-exfiltration#:~:text=Imagine%20you've%20got%20a%20blind%20HTML%20injection%20vulnerability%20but%20you%20can't%20get%20XSS%20because%20of%20the%20site's%20CSP
 [ps-hsts]: https://portswigger.net/kb/issues/01000300_strict-transport-security-not-enforced#:~:text=Typical%20severity,Low
 [ps-referer]: https://portswigger.net/kb/issues/00500400_cross-domain-referer-leakage#:~:text=Typical%20severity,Information
+[ps-url-bypass]: https://portswigger.net/web-security/ssrf/url-validation-bypass-cheat-sheet#:~:text=These%20wordlists%20are%20useful%20for%20attacks%20such%20as%20server%2Dside%20request%20forgery%2C%20CORS%20misconfigurations%2C%20and%20open%20redirection.
 [referrer-last]: https://www.w3.org/TR/referrer-policy/#:~:text=For%20each%20token%20in%20policy%2Dtokens%2C,then%20set%20policy%20to%20token.
 [rest-cc]: https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#:~:text=Instructs%20compliant%20private%20and%20shared%20HTTP%20caches%20not%20to%20store%20the%20response%20or%20reuse%20it%20for%20another%20request
 [rest-cors]: https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#:~:text=Be%20as%20specific%20as%20possible%20and%20as%20general%20as%20necessary%20when%20setting%20the%20origins%20of%20cross%2Ddomain%20calls.

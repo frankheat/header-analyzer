@@ -537,3 +537,10 @@ svg { fill: currentColor; }
 .filter-chip[aria-pressed="true"] .chip-check { display: block; color: var(--md-primary); }
 .finding.decided-excluded :is(.finding-head, .finding-desc, .callout) { opacity: 0.6; }
 .finding.decided-excluded .finding-title { text-decoration: line-through; }
+
+/* A check: the question, then the two outcomes */
+.check-question { margin: 0; }
+.check-outcomes { display: grid; gap: 2px; margin: 6px 0 0; padding: 0; list-style: none; }
+.check-outcomes li { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 6px; align-items: start; }
+.check-outcomes svg { width: 16px; height: 16px; margin-top: 2px; }
+.check-outcomes strong { font-weight: 500; }

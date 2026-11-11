@@ -159,12 +159,14 @@ test('a finding never carries both a check and a recommendation', () => {
   for (const [where, fs] of everyFinding()) for (const f of fs) assert.ok(!(f.verify && f.recommendation), `${where}: ${f.title}`);
 });
 
-test('every check asks something the reader can answer', () => {
+test('every check is a question or an action, with both outcomes', () => {
   for (const [where, fs] of everyFinding()) {
     for (const f of fs) {
-      if (!f.verify) continue;
-      assert.ok(f.verify.length > 80, `${where}: ${f.title}`);
-      assert.ok(f.verify.includes('?') || f.verify.startsWith('Replay') || f.verify.startsWith('Request'), `${where}: ${f.title}`);
+      if (!f.verify) { assert.ok(!f.confirmIf && !f.excludeIf, `${where}: ${f.title}`); continue; }
+      assert.ok(f.verify.endsWith('?') || f.verify.startsWith('Replay') || f.verify.startsWith('Request'), `${where}: ${f.title}`);
+      assert.ok(f.confirmIf && f.excludeIf && f.confirmIf !== f.excludeIf, `${where}: ${f.title}`);
+      assert.ok(f.verify.length < 200, `${where}: ${f.title}`);           // a check, not an explanation
+      assert.ok(!/\bsay\b/.test(f.verify + f.confirmIf + f.excludeIf), `${where}: ${f.title}`);
     }
   }
 });
@@ -191,19 +193,22 @@ test('HSTS threshold follows the profile', () => {
 test('HSTS preload is only asked about when the profile asks', () => {
   const v = 'max-age=63072000; includeSubDomains';
   assert.equal(severityFor('Strict-Transport-Security', v), S.OK);
-  assert.ok(has(findingsFor('Strict-Transport-Security', v, withHsts({ requirePreload: true })), 'preload is not declared'));
+  assert.ok(has(findingsFor('Strict-Transport-Security', v, withHsts({ requirePreload: true })), 'preload list membership not verified'));
 });
 
-for (const [value, title] of [
-  ['max-age=63072000; includeSubDomains', 'preload is not declared'],
-  ['max-age=63072000; includeSubDomains; preload', 'not the same as being on the list'],
+for (const [value, brief] of [
+  ['max-age=63072000; includeSubDomains', 'preload is not set'],
+  ['max-age=63072000; includeSubDomains; preload', 'preload is declared but list membership is unverified'],
 ]) {
-  test(`HSTS preload is contingent either way: ${title}`, () => {
+  test(`HSTS preload is one check, token or not: ${brief}`, () => {
     const f = findingsFor('Strict-Transport-Security', value, withHsts({ requirePreload: true })).find((x) => x.title.includes('preload'));
     assert.equal(f.severity, S.LOW);
+    assert.equal(f.title, 'HSTS: preload list membership not verified');
+    assert.equal(f.brief, brief);
     assert.ok(isContingent(f));
     assert.ok(f.verify.includes('hstspreload.org'));
     assert.ok(f.verify.includes('its base domain'));          // a subdomain is covered by its base domain's entry
+    assert.equal(f.confirmIf, 'it is not listed');
     assert.ok(f.sources.includes('hstspreload-subdomains'));
   });
 }
@@ -282,7 +287,7 @@ for (const value of ['DENY, SAMEORIGIN', 'SAMEORIGIN, bogus', 'ALLOWALL, DENY', 
 test('SAMEORIGIN asks whether the page needs framing', () => {
   const f = findingsFor('X-Frame-Options', 'SAMEORIGIN')[0];
   assert.ok(isContingent(f));
-  assert.ok(f.verify.includes('DENY costs nothing'));
+  assert.ok(f.verify.includes('need to frame this one') && f.confirmIf === 'no' && f.excludeIf === 'yes');
   assert.ok(f.description.includes('every containing document'));
 });
 
@@ -335,7 +340,7 @@ for (const value of ['same-origin-allow-popups', 'noopener-allow-popups']) {
     const f = findingsFor('Cross-Origin-Opener-Policy', value)[0];
     assert.ok(isIssue(f.severity));
     assert.ok(f.description.includes('window.opener'));
-    assert.ok(f.verify.includes('window.open()') && f.verify.includes('same-origin'));
+    assert.ok(f.verify.includes('window.open') && f.confirmIf === 'yes' && f.excludeIf.includes('OAuth'));
   });
 }
 
@@ -476,8 +481,10 @@ test('every caching verdict but no-store carries the same single question', () =
   }
   checks.add(absent('cache-control').findings[0].verify);
   assert.equal(checks.size, 1);
-  const q = [...checks][0];
-  for (const w of ['session cookie', 'Authorization header', 'public', 's-maxage', 'must-revalidate']) assert.ok(q.includes(w));
+  assert.equal([...checks][0], "Does the response carry a signed-in user's data?");
+  // The Authorization nuance stays in the shared-cache description.
+  const shared = findingsFor('Cache-Control', 'max-age=600')[0].description;
+  for (const w of ['Authorization header', 'public', 's-maxage', 'must-revalidate']) assert.ok(shared.includes(w));
 });
 
 test('a token merely containing a directive name is unrecognised; quoted commas do not split', () => {
@@ -498,7 +505,7 @@ test('Clear-Site-Data: quotes are part of the value; unknown types are skipped',
 
 test('every Clear-Site-Data verdict asks whether the session ends here', () => {
   for (const f of [absent('clear-site-data').findings[0], findingsFor('Clear-Site-Data', '*')[0], findingsFor('Clear-Site-Data', '"cookies"')[0]]) {
-    assert.ok(isContingent(f) && f.verify.includes('ends a session'));
+    assert.ok(isContingent(f) && f.verify.includes('end a session'));
   }
   assert.ok(!isContingent(findingsFor('Clear-Site-Data', '"*"')[0]));
   assert.equal(worstSeverity(absent('clear-site-data')), S.LOW);
@@ -510,7 +517,8 @@ test('ACAO single origin: LOW to confirm, and the check names the replay', () =>
   const f = findingsFor('Access-Control-Allow-Origin', 'https://app.example.com')[0];
   assert.equal(f.severity, S.LOW);
   assert.ok(isContingent(f));
-  for (const w of ['Origin: https://an-origin-you-made-up.example', 'comes back', 'nothing here', 'https://app.example.com']) assert.ok(f.verify.includes(w));
+  assert.ok(f.verify.includes('Origin: https://attacker.example') && f.verify.includes('PortSwigger'));
+  assert.ok(f.excludeIf.includes('https://app.example.com') && f.sources.includes('ps-url-bypass'));
 });
 
 test('ACAO wildcard names the case that matters', () => {

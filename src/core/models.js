@@ -56,7 +56,10 @@
    *
    * Whether it applies is a separate question, and for some checks the response
    * cannot settle it. Those findings carry `verify`: the check that settles it,
-   * and what each outcome means. An empty `verify` is the claim that the
+   * a closed question or an action, with `confirmIf` and `excludeIf`, the
+   * answer that makes it stand and the one that drops it (on an OK note, the
+   * answer that shows a problem and the one that shows none; see check()).
+   * An empty `verify` is the claim that the
    * response is enough on its own. A finding therefore has either `verify` or
    * `recommendation`, never both: until the check is done there is nothing to
    * recommend.
@@ -75,11 +78,18 @@
       description: o.description || '',
       recommendation: o.recommendation || '',
       verify: o.verify || '',
+      confirmIf: o.confirmIf || '',
+      excludeIf: o.excludeIf || '',
       // `brief` is the short clause after the status in the findings list.
       status: 'status' in o ? o.status : Status.MISCONFIGURED,
       brief: o.brief || '',
       sources,
     };
+  }
+
+  /** The options for a check: what to ask or do, then the two outcomes. */
+  function check(verify, confirmIf, excludeIf) {
+    return { verify, confirmIf, excludeIf };
   }
 
   /** A problem the response cannot settle on its own (an OK note may carry a check too). */
@@ -110,6 +120,7 @@
     SEVERITY_NAMES,
     Status,
     finding,
+    check,
     isContingent,
     isIssue,
     worstSeverity,

@@ -9,7 +9,7 @@
 (function (HL) {
   'use strict';
 
-  const { Severity, Status, finding } = HL.models;
+  const { Severity, Status, finding, check } = HL.models;
   const { splitOutsideQuotes, parseDirectives, parseSfItem, parseSfDictionary, trimOWS } = HL.fields;
   const { evaluateCsp } = HL.csp;
 
@@ -203,22 +203,17 @@
     if (cfg.requirePreload) {
       // The list entry is for the base domain and covers its subdomains, so a
       // subdomain's own header need not carry the token.
-      const listed = 'Is the domain, or its base domain (example.com for api.example.com), on the preload list? Check hstspreload.org. If it is, there is nothing here. If it is not, ';
-      if (!directives.has('preload')) {
-        findings.push(finding(HSTS, Severity.LOW, 'HSTS: preload is not declared', {
-          sources: ['cs-hsts-rec', 'hstspreload-token', 'hstspreload-base', 'hstspreload-subdomains'],
-          brief: 'preload is not set',
-          description: 'Preloading is what closes the one gap HSTS cannot close on its own: the first request to this domain, made before the browser has ever seen the site, goes out over plain HTTP and can be stripped by anyone on the network path.',
-          verify: listed + 'this stands. Preloading is also hard to undo and covers every subdomain, so a site may have declined it deliberately: that is a decision to record, not a defect to report.',
-        }));
-      } else {
-        findings.push(finding(HSTS, Severity.LOW, 'HSTS: preload is declared, which is not the same as being on the list', {
-          sources: ['hstspreload-token', 'hstspreload-base', 'hstspreload-subdomains'],
-          brief: 'preload is declared but list membership is unverified',
-          description: 'The token is what a domain must send to be accepted, not what puts it there: submission at hstspreload.org is a separate step, and it can be refused or reversed. A domain can carry this token for years without ever being listed.',
-          verify: listed + 'the first-visit protection this header looks like it provides does not exist, and the site is exactly where it would be without the token.',
-        }));
-      }
+      const token = directives.has('preload');
+      findings.push(finding(HSTS, Severity.LOW, 'HSTS: preload list membership not verified', {
+        sources: token ? ['hstspreload-token', 'hstspreload-base', 'hstspreload-subdomains']
+          : ['cs-hsts-rec', 'hstspreload-token', 'hstspreload-base', 'hstspreload-subdomains'],
+        brief: token ? 'preload is declared but list membership is unverified' : 'preload is not set',
+        description: 'Preloading is what closes the one gap HSTS cannot close on its own: the first request to this domain, made before the browser has ever seen the site, goes out over plain HTTP and can be stripped by anyone on the network path. '
+          + (token
+            ? 'The token is what a domain must send to be accepted, not what puts it there: submission at hstspreload.org is a separate step, and it can be refused or reversed. A domain can carry this token for years without ever being listed.'
+            : 'This header does not carry the preload token, which a domain must send to be accepted; a subdomain can still be covered through its base domain\'s entry.'),
+        ...check('Is the domain, or its base domain (example.com for api.example.com), on hstspreload.org?', 'it is not listed', 'it is listed'),
+      }));
     }
     if (!findings.length) findings.push(finding(HSTS, Severity.OK, 'HSTS correctly configured', { sources: ['cs-hsts-rec', 'asvs-3.4.1'] }));
     return findings;
@@ -258,7 +253,7 @@
         sources: ['html-xfo-sameorigin', 'cs-xfo-rec', 'bp-xfo'],
         brief: 'SAMEORIGIN instead of DENY',
         description: 'A browser walks every containing document and refuses the frame as soon as one is cross-origin, so this is as strong as frame-ancestors \'self\'. What it still permits is a page on this same origin. That matters where an attacker can put markup on one: a stored HTML injection that a CSP stops short of script execution, say: they cannot read anything through it, but they can frame this page and overlay it, which DENY would have prevented outright.',
-        verify: 'Does another page on this origin need to frame this one (an admin console, a preview pane, an embedded editor)? If one does, this stands and the exposure is the price of the feature. If none does, DENY costs nothing and closes it.',
+        ...check('Does another page on this origin need to frame this one (an admin console, a preview pane, an embedded editor)?', 'no', 'yes'),
       })];
     }
     if (only.startsWith('allow-from')) {
@@ -344,7 +339,7 @@
         sources: ['asvs-3.4.8', 'cs-coop-rec'],
         brief: `${n} instead of same-origin`,
         description: `${COOP_ALLOW_POPUPS_KEPT[n]} What it gives up is in the other direction: a window this document opens with window.open() stays in its browsing context group if that window sends no COOP of its own, so the window keeps a window.opener reference back and can probe this document through it. That only matters if this document opens windows it does not control.`,
-        verify: 'What does this document pass to window.open()? A provider the site chose, an OAuth or payment flow, is what this value exists for, and there is nothing here. A URL the site does not control keeps a window.opener reference back to this document, and then this stands: same-origin severs it.',
+        ...check('Does this document open windows (window.open) on sites it does not control?', 'yes', 'no, or only providers the site chose (an OAuth or payment flow)'),
       })];
     }
     if (n === 'unsafe-none') {
@@ -415,7 +410,7 @@
         sources: ['cs-corp', 'zap-90004-1'],
         brief: 'cross-origin lets any site load the resource',
         description: 'Any site can embed this resource in no-cors mode, which brings it into that site\'s process, readable through a Spectre-style side channel on browsers without full site isolation. For a resource meant to be public (a CDN asset, an embeddable widget) that is the intent.',
-        verify: 'Is this resource meant to be embedded by other sites? If it is, there is nothing here: cross-origin is the value for public assets. If it is not, this stands, and same-site or same-origin closes it.',
+        ...check('Is this resource meant to be loaded by other sites (a public image, script or font, an embeddable widget)?', 'no', 'yes'),
       })];
     }
     return [finding(H, ctx.absentSeverity, `CORP: unrecognized value '${value}', not applied`, {
@@ -539,7 +534,7 @@
         sources: ['permissions-delegation', 'cs-pp-rec'],
         brief: `${delegated.map(([f]) => f).join(', ')} delegated to another origin`,
         description: 'A browser keeps these to this origin; the policy hands them to the origins named here, so a document from one of them, embedded in this page, can ask for them. What the user is shown when it does is this site\'s name: browsers put the top-level origin in the permission prompt rather than the frame\'s, so someone reading "this site wants to use your camera" has no way to learn that the stream goes somewhere else. Delegating is what this header is for, so this is a question about who was chosen, not a defect in itself. It sits below an allowlist of * because that one also admits a frame nobody chose: an HTML injection that can place an iframe is enough to reach the prompt, while a named origin has to be compromised first.',
-        verify: 'What does this page embed, and are these origins parties you meant to give the camera, the microphone or the location to? If they are, there is nothing here: this is the header doing its job. If they are not, or if you cannot say what one of these domains is, the user cannot tell either: the prompt they answer will carry this site\'s name.',
+        ...check('Is each origin in the header a known service that needs this feature (for example, a video-call or identity-verification provider)?', 'no, or you cannot tell what one of them is', 'yes'),
       }));
     }
 
@@ -548,9 +543,8 @@
       findings.push(finding(PP, Severity.LOW, `Permissions-Policy: reachable by an embedded document: ${embeds.join(', ')}`, {
         sources: ['chromium-topics', 'attribution-default', 'chromium-uach', 'chromium-pst-issuance', 'chromium-pst-redemption', 'chromium-storage-access', 'chromium-gamepad', 'chromium-pip', 'chromium-deferred'],
         brief: 'Tracking features left open to embedded content',
-        description: 'A browser allows these to every origin, so any cross-origin document this page embeds can use them until the policy says otherwise: reading the user\'s inferred interest topics, asking for high-entropy user-agent hints, registering ad attributions, issuing and redeeming tracking tokens, requesting its own third-party cookies. (gamepad, picture-in-picture and deferred-fetch-minimal are open the same way, with nothing worth reporting behind them.) This is the user\'s privacy toward parties the site chose to embed, and for an advertising or analytics frame it is what the frame was embedded to do: which is why it is stated rather than counted as a defect. Closing them to an embed takes (self); () also takes them from this origin.',
-        verify: 'What does this page embed? For an advertising or analytics frame, reading topics and registering attributions is what it was embedded to do, and there is nothing here. For a frame that is there for something else (a chat widget, a video player) it picks these up along the way, and closing them costs nothing: '
-          + embeds.map((f) => f + '=()').join(', '),
+        description: 'A browser allows these to every origin, so any cross-origin document this page embeds can use them until the policy says otherwise: reading the user\'s inferred interest topics, asking for high-entropy user-agent hints, registering ad attributions, issuing and redeeming tracking tokens, requesting its own third-party cookies. (gamepad, picture-in-picture and deferred-fetch-minimal are open the same way, with nothing worth reporting behind them.) This is the user\'s privacy toward parties the site chose to embed, and for an advertising or analytics frame it is what the frame was embedded to do: which is why it is stated rather than counted as a defect. Closing them to an embed takes (self); () also takes them from this origin. To close them: ' + embeds.map((f) => f + '=(self)').join(', ') + '.',
+        ...check('Does this page embed content from other sites that is not advertising or analytics (a chat widget, a video player, a map)?', 'yes', 'no, it embeds nothing from other sites, or only advertising or analytics'),
       }));
     }
 
@@ -559,9 +553,8 @@
       findings.push(finding(PP, Severity.LOW, `Permissions-Policy: an XSS on this origin could ask for ${oneClick.join(', ')}`, {
         sources: ['mediacapture-default', 'geolocation-default', 'permissions-delegation', 'cs-pp-example'],
         brief: `${oneClick.join(', ')} not disabled`,
-        description: 'Nothing embedded cross-origin can reach these: a browser keeps them to this origin either way. What is left open is script that achieves execution here: it can raise the permission prompt, and the prompt names the site, never the code that asked, so a user who has no way to tell the two apart grants it. One click is the whole interaction. Disabling them removes the prompt itself; (self) does not, because an XSS runs on this origin.',
-        verify: 'Does this response need them? If it does not, this stands: script that reaches execution here can raise the prompt, and one click grants it: '
-          + oneClick.map((f) => f + '=()').join(', ') + '. If it does, the header is per-response, so they can still be closed on every other response.',
+        description: 'Nothing embedded cross-origin can reach these: a browser keeps them to this origin either way. What is left open is script that achieves execution here: it can raise the permission prompt, and the prompt names the site, never the code that asked, so a user who has no way to tell the two apart grants it. One click is the whole interaction. Disabling them removes the prompt itself; (self) does not, because an XSS runs on this origin. To close them: ' + oneClick.map((f) => f + '=()').join(', ') + '.',
+        ...check('Does this page use these features itself (for example, the camera for video identification)?', 'no', 'yes'),
       }));
     }
 
@@ -627,7 +620,7 @@
     'stale-while-revalidate', 'stale-if-error',
   ]);
 
-  const CACHE_VERIFY = 'Does this response carry data belonging to a signed-in user? If it does not, there is nothing here: storing a public resource is what these directives are for, and no-store would only cost bandwidth. If it does, how is the user identified? By a session cookie: this stands, and a shared cache can hand the response to the next person who asks for the same URL. By an Authorization header: RFC 9111 §3.5 already bars a shared cache from reusing it, so what is left is the copy on the user\'s own disk, unless the value also carries public, s-maxage or must-revalidate, the three directives that switch shared-cache reuse back on for exactly those requests.';
+  const CACHE_CHECK = check('Does the response carry a signed-in user\'s data?', 'yes', 'no (a public page or resource)');
 
   function checkCacheControl(value, ctx) {
     const CC = 'Cache-Control';
@@ -641,7 +634,7 @@
         sources: ['rfc9111-heuristic', 'cs-cc-default', 'zap-10015'],
         brief: 'No valid directive, so heuristic caching applies',
         description: 'None of these tokens is a standard cache directive, so caches ignore them and fall back to heuristic freshness, the same position as sending no Cache-Control at all. Nothing keeps this response out of a shared cache.',
-        verify: CACHE_VERIFY,
+        ...CACHE_CHECK,
       })];
     }
     if (d.has('no-store')) return [finding(CC, Severity.OK, 'Cache-Control: no-store (not stored by any cache)', { sources: ['cs-cc-nostore', 'asvs-14.3.2', 'bp-cc'] })];
@@ -650,7 +643,7 @@
         sources: ['rfc9111-private', 'cs-cc-private', 'bp-cache'],
         brief: 'private still allows storage on disk',
         description: 'Shared caches will not store the response, so it cannot be served to another user. The browser still writes it to disk, where it can be recovered with the back button after logout, or by whoever uses the machine next.',
-        verify: CACHE_VERIFY,
+        ...CACHE_CHECK,
       })];
     }
     const alwaysRevalidates = bare('no-cache')
@@ -660,7 +653,7 @@
         sources: ['cs-cc-nocache'],
         brief: 'Revalidates but does not prevent storage',
         description: 'Revalidation before reuse is forced, but storage is not prevented. A shared cache may keep the response, and nothing here marks it as belonging to a single user.',
-        verify: CACHE_VERIFY,
+        ...CACHE_CHECK,
       })];
     }
     const qualified = ['private', 'no-cache'].find((n) => d.get(n));
@@ -668,8 +661,8 @@
     return [finding(CC, Severity.MEDIUM, `Cache-Control: '${value}' lets a shared cache store this response`, {
       sources: ['cs-cc-nostore', 'asvs-14.3.2', 'rfc9111-auth-directives', 'ps-cache'],
       brief: 'Shared caches may store the response',
-      description: 'Nothing here keeps the response out of a shared cache, so a CDN or proxy may store it under this URL and serve it to the next person who asks, one user\'s data handed to another.' + detail,
-      verify: CACHE_VERIFY,
+      description: 'Nothing here keeps the response out of a shared cache, so a CDN or proxy may store it under this URL and serve it to the next person who asks, one user\'s data handed to another. If requests carry an Authorization header, RFC 9111 already keeps shared caches from reusing the response, unless the value also has public, s-maxage or must-revalidate: then only the copy on the user\'s disk remains.' + detail,
+      ...CACHE_CHECK,
     })];
   }
 
@@ -695,7 +688,7 @@
         sources: ['zap-20016-1', 'adobe-master', 'mdn-xpcdp'],
         brief: `${n} allows cross-domain policy files`,
         description: 'Allows cross-domain policy files to be loaded. A PDF opened in the Adobe Reader plugin, or legacy Flash content, can request a cross-domain policy from this origin, and a permissive policy grants it.',
-        verify: 'Does this origin serve files a browser plugin might load (PDFs opened in Adobe Reader, or SWF files for Flash)? If it does not, there is nothing here: no content a plugin can load means no cross-domain policy to exploit. If it does, this stands.',
+        ...check('Does this origin serve files a browser plugin can load (for example, PDFs opened in Adobe Reader, or SWF files)?', 'yes', 'no'),
       })];
     }
     return [finding(H, ctx.absentSeverity, `X-Permitted-Cross-Domain-Policies: unrecognized value '${value}'`, {
@@ -901,15 +894,17 @@
       sources: ['cs-xdns', 'bp-xdns-pii', 'bp-xdns-inj', 'cs-xdns-nonstd'],
       brief: 'DNS prefetching is not disabled',
       description: DNS_PREFETCH_TEXT,
-      verify: DNS_PREFETCH_VERIFY,
+      ...DNS_PREFETCH_CHECK,
     })];
   }
 
   // OWASP Cheat Sheet: off "if you do not control links on your website".
   // OWASP Secure Headers Project: add it to responses that "Return sensitive or
-  // private content", or are "Prone to HTML injection". Either condition makes
-  // it stand.
-  const DNS_PREFETCH_VERIFY = 'Does the page show any of these: links to sites you do not control, personal or sensitive data, or input from users? If it does, this stands. If it shows none, there is nothing here.';
+  // private content", or are "Prone to HTML injection". The check asks only for
+  // what opens a channel: a link to another site, or an injection that can add
+  // one. Personal data alone, or user content the page escapes, opens none (a
+  // deviation noted in RULES.md).
+  const DNS_PREFETCH_CHECK = check('Does the page have links (<a href>) to external sites (including links made from what users write), or an HTML injection?', 'either', 'neither');
 
   const DNS_PREFETCH_TEXT = 'DNS prefetching resolves domains linked in the page before the user clicks. The DNS resolver learns every hostname the page links to (internal services, private subdomains, an admin panel the page references) whether or not the user navigates there. And an attacker with HTML injection can exfiltrate data through it: <link rel=dns-prefetch> resolves before any CSP directive can stop it, so a page whose CSP blocks scripts, images and connections still leaks data through DNS queries to a resolver the attacker controls. The header is non-standard and only some browsers honour it.';
 
@@ -933,6 +928,9 @@
     })];
   }
 
+  // Shared with correlations.js, which asks the same with credentials.
+  const REFLECTION_REPLAY = 'Replay the request with the header Origin: https://attacker.example, then with origins that try to slip past the server\'s check (see the PortSwigger URL validation bypass cheat sheet in Sources).';
+
   function checkAcao(value) {
     const H = 'Access-Control-Allow-Origin';
     const n = value.trim();
@@ -941,7 +939,7 @@
         sources: ['asvs-3.4.2-star', 'cs-acao-public', 'bp-cors-public', 'obs-cors-public'],
         brief: 'Any origin can read the response',
         description: 'Any site can read this response. That costs nothing if the endpoint is genuinely public, which is what the wildcard is for. It matters when the endpoint is reachable by a victim\'s browser but not by an attacker\'s server: an internal API, a service on localhost, a device admin page, anything authorised by network or IP rather than by credentials. Without the wildcard a browser sends such a request but refuses to hand the response to the calling page; with it, an attacker\'s page reads the answer through the browser of whoever can reach the endpoint.',
-        verify: 'Is this endpoint reachable from anywhere, or only from certain networks? Reachable from anywhere and it costs nothing: that is what the wildcard is for. Limited in any way (an internal network, a VPN, localhost) and this stands: name the origins allowed to read it instead of *.',
+        ...check('Is this endpoint reachable only from certain networks or addresses (for example, an internal network, a VPN, an IP allowlist)?', 'yes', 'no, anyone on the internet can reach it'),
       })];
     }
     if (n !== 'null' && n.toLowerCase() === 'null') {
@@ -977,10 +975,10 @@
       })];
     }
     return [finding(H, Severity.LOW, `Access-Control-Allow-Origin: single origin ('${n}'), an allowlist or a mirror`, {
-      sources: ['asvs-3.4.2', 'bp-cors-mirror', 'cs-acao-rec'],
+      sources: ['asvs-3.4.2', 'bp-cors-mirror', 'cs-acao-rec', 'ps-url-bypass'],
       brief: 'Single origin, possibly reflected',
       description: 'One origin is authorised, which is how CORS is meant to be used. But a server that copies the request\'s Origin header into the response produces exactly this, and then the authorised origin is whichever one asked: any site reads what this endpoint returns, the same as *.',
-      verify: `Replay the request with Origin: https://an-origin-you-made-up.example. If it comes back here, the origin is reflected and this stands. If the header keeps naming ${n} or disappears, the allowlist is real and there is nothing here.`,
+      ...check(REFLECTION_REPLAY, 'the response allows any of these origins in Access-Control-Allow-Origin', `every attempt still gets ${n}, or no Access-Control-Allow-Origin`),
     })];
   }
 
@@ -1008,7 +1006,7 @@
         sources: ['sw-allowed'],
         brief: 'Service worker scope covers the whole site',
         description: 'A service worker registered from this script can intercept every request on the origin. Whoever can control that script (through an upload, a JSONP endpoint or a compromised dependency) controls every page of the site, persistently.',
-        verify: 'Is this the site\'s own service worker, meant to control the whole origin? If it is, there is nothing here. If the script lives somewhere less controlled, this stands; restrict the scope to the path it needs.',
+        ...check('Is this the site\'s own service worker, meant to control the whole site?', 'no (for example, the script is in a path others can write to, such as user uploads, or it only needs part of the site)', 'yes'),
       })];
     }
     return [finding(H, Severity.OK, `Service-Worker-Allowed: '${n}'`, {
@@ -1079,7 +1077,7 @@
   const CSD_TYPES = new Set(['"cache"', '"cookies"', '"storage"', '"executionContexts"', '"clientHints"', '"prefetchCache"', '"prerenderCache"']);
   const CSD_WILDCARD = '"*"';
   const CSD_EXPECTED = ['"cache"', '"cookies"', '"storage"'];
-  const CSD_VERIFY = 'Is this a response that ends a session: a logout, a password change, an account deletion? If it is not, there is nothing here: this header only has a job where data should stop being available, and clearing a visitor\'s storage on an ordinary response would be the defect. If it is, what the response leaves behind stays readable to whoever uses the browser next.';
+  const CSD_CHECK = check('Does this response end a session (for example, a logout, a password change, an account deletion)?', 'yes', 'no');
 
   function checkClearSiteData(value) {
     const H = 'Clear-Site-Data';
@@ -1090,7 +1088,7 @@
         sources: ['csd-grammar', 'csd-unknown'],
         brief: 'Invalid values, so nothing is cleared',
         description: 'Every value has to be a quoted string (the grammar is 1#( quoted-string )) and a browser compares each one with its quotes still attached, case-sensitively. None of these matches a type it knows, so the list it builds is empty and no data is removed. Writing * or cookies without quotes is the usual way to land here.',
-        verify: CSD_VERIFY,
+        ...CSD_CHECK,
       })];
     }
     if (known.has(CSD_WILDCARD)) return [finding(H, Severity.OK, 'Clear-Site-Data: "*" (every type cleared)', { sources: ['asvs-14.3.1'] })];
@@ -1100,7 +1098,7 @@
         sources: ['csd-subset', 'bp-csd-time', 'asvs-14.3.1'],
         brief: `${missing.join(', ')} not cleared`,
         description: 'Some types are cleared and these are not. Leaving one out can be deliberate: the specification has an example of a site clearing a subset on purpose, because sweeping every subdomain does damage of its own, and OWASP notes the header costs the browser additional processing time.',
-        verify: CSD_VERIFY + ' Was leaving these out a decision? What the session relies on decides whether it matters: a token in localStorage outlives a policy that clears only cookies.',
+        ...check('Does this response end a session, and does the application keep anything in the types it leaves out (for example, a token in localStorage when "storage" is missing)?', 'yes to both', 'it does not end a session, or nothing the application relies on is in those types'),
       })];
     }
     return [finding(H, Severity.OK, 'Clear-Site-Data: cache, cookies and storage cleared', { sources: ['asvs-14.3.1', 'bp-csd-logout'] })];
@@ -1150,10 +1148,10 @@
 
   // Where an absence only matters under a condition the response does not
   // state, the finding carries that check instead of a recommendation.
-  const MISSING_VERIFY = {
-    'cache-control': CACHE_VERIFY,
-    'clear-site-data': CSD_VERIFY,
-    'x-dns-prefetch-control': DNS_PREFETCH_VERIFY,
+  const MISSING_CHECKS = {
+    'cache-control': CACHE_CHECK,
+    'clear-site-data': CSD_CHECK,
+    'x-dns-prefetch-control': DNS_PREFETCH_CHECK,
   };
 
   const MISSING_DESCRIPTIONS = {
@@ -1355,7 +1353,7 @@
       return [finding(H, Severity.LOW, 'Content-Type: text/html on an API response', {
         status: Status.MISCONFIGURED, brief: 'Declared as HTML',
         description: 'The response declares itself HTML, so a browser that opens it renders it as a page, and anything injected into it can run as markup.',
-        verify: 'Is the body really HTML? If it is JSON, XML or anything else, this stands: declare the type the API returns, such as application/json. If the body is HTML, there is nothing here about the type itself.',
+        ...check('Is the body of the response an HTML document?', 'no (JSON, XML, plain text or anything else)', 'yes'),
         sources: ['rest-ct', 'asvs-4.1.1'],
       })];
     }
@@ -1371,7 +1369,7 @@
       return [finding(H, Severity.LOW, `Content-Type: ${mime.essence} on an API response`, {
         status: Status.MISCONFIGURED, brief: 'Declared as JavaScript',
         description: JS_TYPE_RISK,
-        verify: 'Is the body really JavaScript? If it is JSON or anything else, this stands: declare the type the API returns, such as application/json. If the body is a script, there is nothing here about the type itself.',
+        ...check('Is the body of the response a script (JavaScript code)?', 'no (JSON or anything else)', 'yes'),
         sources: ['rest-ct-js', 'mimesniff-js', 'mdn-corp-xssi'],
       })];
     }
@@ -1421,7 +1419,7 @@
     return [finding(H, Severity.LOW, apiTitle(H, empty), {
       status: apiStatus(empty), brief: 'Any site can load the response',
       description: "Without CORP, any site can load this endpoint with a tag such as <script> or <img>. If the browser sends the user's cookies with it, the response, with the user's data, enters that site's process: a response that parses as script can be read directly (Cross-Site Script Inclusion), any response is exposed to Spectre-style reads, and whether it loads tells the site whether the user is signed in. Cross-Origin-Resource-Policy: same-origin makes the browser drop the response first. Browsers that implement opaque response blocking already withhold a JSON, HTML or XML response from such a tag, when the Content-Type is right; CORP asks for the same protection explicitly, from every browser and for every type of response, as defence in depth.",
-      verify: 'Does this endpoint answer GET requests with user data, authenticated by cookies? If it does not (it only accepts POST, it authenticates with an Authorization header, or every cookie it relies on is set with SameSite=Lax or Strict), a tag on another site gets nothing of the user\'s and there is nothing here. If it does, this stands: set Cross-Origin-Resource-Policy: same-origin.',
+      ...check('Does this endpoint answer GET requests with user data, authenticated by a cookie?', 'yes, and the cookie is SameSite=None or has no SameSite attribute', 'it only accepts POST, it authenticates with an Authorization header, or the cookie is SameSite=Lax or Strict'),
       sources: ['webdev-corp-api', 'webdev-corp-all', 'mdn-corp-xssi', 'mdn-corp-spectre', 'mdn-corp-nocors', 'orb-blocklist', 'fetch-method-get', 'mdn-samesite-lax', 'mdn-samesite-default'],
     })];
   }
@@ -1490,7 +1488,7 @@
       const findings = [];
       let value = null;
 
-      const verify = MISSING_VERIFY[key] || '';
+      const missingCheck = MISSING_CHECKS[key] || null;
       const missingSources = [
         ...(xfoFallbackOnly ? ['csp3-fa-xfo', 'cs-xfo-fa', 'obs-xfo-csp'] : (MISSING_SOURCES[key] || [])),
         ...(api && key === 'cache-control' ? ['rest-cc'] : []),
@@ -1502,8 +1500,8 @@
         description: pragmaInstead ? `${description} ${PRAGMA_INSTEAD}` : description,
         status,
         brief,
-        recommendation: verify ? '' : (MISSING_RECS[key] || `Add the ${canonical} header.`),
-        verify,
+        recommendation: missingCheck ? '' : (MISSING_RECS[key] || `Add the ${canonical} header.`),
+        ...missingCheck,
         sources: pragmaInstead ? [...missingSources, 'rfc9111-pragma-response', 'mdn-pragma'] : missingSources,
       });
       const absent = (title) => (xfoFallbackOnly
@@ -1563,6 +1561,7 @@
 
   HL.rules = Object.freeze({
     SECURITY_HEADERS,
+    REFLECTION_REPLAY,
     analyzeHeaders,
     PP_TRACKING,
     PP_ONE_CLICK,

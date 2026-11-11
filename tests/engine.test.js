@@ -368,7 +368,7 @@ test('REST API: the defence-in-depth headers are explained, never graded', () =>
 test('REST API: Cache-Control keeps the page rules, a check on user data, citing the REST cheat sheet', () => {
   const missing = byKey(analyze(BARE, 'basic', 'api'))['cache-control'].findings[0];
   assert.ok(isContingentFinding(missing));
-  assert.ok(missing.verify.startsWith('Does this response carry data belonging to a signed-in user?'));
+  assert.equal(missing.verify, "Does the response carry a signed-in user's data?");
   assert.ok(missing.sources.includes('rest-cc'));
   const shared = byKey(analyze('HTTP/1.1 200 OK\r\nCache-Control: public, max-age=3600\r\n\r\n', 'basic', 'api'))['cache-control'].findings[0];
   assert.equal(shared.severity, S.MEDIUM);
@@ -411,7 +411,7 @@ test('REST API: Content-Type text/html is a check; no charset is asked of JSON',
   assert.ok(isContingentFinding(html['content-type'].findings[0]));
   const js = byKey(analyze('HTTP/1.1 200 OK\r\nContent-Type: Application/JavaScript; charset=utf-8\r\n\r\n', 'basic', 'api'));
   assert.ok(isContingentFinding(js['content-type'].findings[0]));
-  assert.ok(js['content-type'].findings[0].verify.startsWith('Is the body really JavaScript?'));
+  assert.ok(js['content-type'].findings[0].verify.startsWith('Is the body of the response a script'));
   const json = byKey(analyze('HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n', 'basic', 'api'));
   assert.equal(json['content-type'].findings[0].severity, S.OK);
 });
@@ -449,16 +449,17 @@ test('the API sample selects REST API mode; the others leave the mode alone', ()
 test('REST API: a missing CORP asks about GET requests with user data and cookies', () => {
   const f = byKey(analyze(BARE, 'extended', 'api'))['cross-origin-resource-policy'].findings[0];
   assert.ok(isContingentFinding(f));
-  assert.ok(f.verify.startsWith('Does this endpoint answer GET requests with user data, authenticated by cookies?'));
+  assert.ok(f.verify.startsWith('Does this endpoint answer GET requests with user data, authenticated by a cookie?'));
+  assert.ok(f.confirmIf.includes('no SameSite attribute') && f.excludeIf.includes('Authorization header'));
   assert.ok(f.sources.includes('webdev-corp-api'));
 });
 
-test('X-DNS-Prefetch-Control asks about both OWASP conditions', () => {
+test('X-DNS-Prefetch-Control asks only for what opens a channel: an external link or an injection', () => {
   const f = analyze('HTTP/1.1 200 OK\r\nX-Nothing: x\r\n\r\n', 'basic').results.find((r) => r.key === 'x-dns-prefetch-control').findings[0];
-  assert.ok(f.verify.includes('do not control'));              // Cheat Sheet
-  assert.ok(f.verify.includes('personal or sensitive data'));   // Secure Headers Project
-  assert.ok(f.verify.includes('input from users'));             // where HTML injection happens
-  assert.ok(f.verify.startsWith('Does the page show'));        // Web page mode: it is a page
+  assert.ok(f.verify.includes('external sites'));              // Cheat Sheet: links you do not control
+  assert.ok(f.verify.includes('HTML injection'));              // Secure Headers Project
+  assert.ok(!f.verify.includes('personal'));                   // deviation: personal data alone opens no channel
+  assert.equal(f.confirmIf, 'either');
 });
 
 test('Referrer-Policy origin and origin-when-cross-origin are settled', () => {
