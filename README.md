@@ -75,6 +75,11 @@ check: a JSON body declared as `text/html` or as JavaScript.
   [OWASP REST Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html):
   with Basic only the headers that cheat sheet lists, with Extended the same 25
   headers, each with the criterion for an API response.
+- **English or Italian.** The switch in the top bar translates the whole
+  interface: findings, checks, reading notes and the copied list, which in
+  Italian uses the statuses Assente, Configurazione non corretta, Duplicato and
+  Deprecato. Severities stay HIGH, MEDIUM and LOW, and source quotes stay in
+  their original language. The first visit follows the browser's language.
 - **Accessible.** Keyboard navigation, screen-reader announcements, reduced motion,
   and a light/dark switch that follows the system until you choose a theme.
   Severity is always written as a word, never shown by

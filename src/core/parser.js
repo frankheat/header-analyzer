@@ -12,7 +12,7 @@
  * would discard are discarded here too, and each is reported as a parse note so
  * nothing disappears without a word.
  */
-(function (HL) {
+globalThis.HeaderAnalyzer.i18n.module(function (HL, L) {
   'use strict';
 
   const { trimOWS } = HL.fields;
@@ -57,9 +57,9 @@
       if (line[0] === ' ' || line[0] === '\t') {
         if (last) {
           last.value = trimOWS(last.value + ' ' + trimOWS(line));
-          notes.push(`Line ${i + 1}: a folded continuation line (obs-fold) was joined to ${last.name}. Folding is deprecated by RFC 9112 §5.2.`);
+          notes.push(L(`Line ${i + 1}: a folded continuation line (obs-fold) was joined to ${last.name}. Folding is deprecated by RFC 9112 §5.2.`, `Riga ${i + 1}: una riga di continuazione (obs-fold) è stata unita a ${last.name}. Il folding è deprecato da RFC 9112 §5.2.`));
         } else {
-          notes.push(`Line ${i + 1}: an indented line with no field before it was ignored.`);
+          notes.push(L(`Line ${i + 1}: an indented line with no field before it was ignored.`, `Riga ${i + 1}: una riga rientrata senza un campo prima è stata ignorata.`));
         }
         continue;
       }
@@ -75,7 +75,7 @@
         }
       }
       if (colon <= 0) {
-        notes.push(`Line ${i + 1}: "${clip(line)}" is not a field line (no "name: value") and was ignored.`);
+        notes.push(L(`Line ${i + 1}: "${clip(line)}" is not a field line (no "name: value") and was ignored.`, `Riga ${i + 1}: "${clip(line)}" non è una riga di campo (manca "nome: valore") ed è stata ignorata.`));
         last = null;
         continue;
       }
@@ -83,12 +83,12 @@
       const rawName = line.slice(0, colon);
       const name = rawName.replace(/[ \t]+$/, '');
       if (!TOKEN.test(name)) {
-        notes.push(`Line ${i + 1}: "${clip(rawName)}" is not a valid field name, so browsers discard the line. It was ignored.`);
+        notes.push(L(`Line ${i + 1}: "${clip(rawName)}" is not a valid field name, so browsers discard the line. It was ignored.`, `Riga ${i + 1}: "${clip(rawName)}" non è un nome di campo valido, quindi i browser scartano la riga. È stata ignorata.`));
         last = null;
         continue;
       }
       if (name !== rawName) {
-        notes.push(`Line ${i + 1}: whitespace between the field name "${name}" and the colon is forbidden by RFC 9112 §5.1. Clients handle it inconsistently; it was read as "${name}".`);
+        notes.push(L(`Line ${i + 1}: whitespace between the field name "${name}" and the colon is forbidden by RFC 9112 §5.1. Clients handle it inconsistently; it was read as "${name}".`, `Riga ${i + 1}: lo spazio tra il nome del campo "${name}" e i due punti è vietato da RFC 9112 §5.1. I client lo gestiscono in modo diverso; è stato letto come "${name}".`));
       }
       const field = { name: name, lower: name.toLowerCase(), value: trimOWS(line.slice(colon + 1)) };
       fields.push(field);
@@ -110,7 +110,7 @@
     const notes = [];
     if (typeof text !== 'string') text = String(text == null ? '' : text);
     if (text.length > MAX_INPUT) {
-      return { response: null, notes, error: `The input is larger than ${MAX_INPUT / 1024 / 1024} MB. Only the response headers are needed.` };
+      return { response: null, notes, error: L(`The input is larger than ${MAX_INPUT / 1024 / 1024} MB. Only the response headers are needed.`, `L'input supera ${MAX_INPUT / 1024 / 1024} MB. Servono solo gli header della risposta.`) };
     }
     if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
     const lines = splitLines(text);
@@ -130,10 +130,10 @@
       if (j >= lines.length) {
         return {
           response: null, notes, request,
-          error: 'This is an HTTP request, not a response. Paste the response the server sent back: it starts with a status line such as "HTTP/1.1 200 OK".',
+          error: L('This is an HTTP request, not a response. Paste the response the server sent back: it starts with a status line such as "HTTP/1.1 200 OK".', "Questa è una richiesta HTTP, non una risposta. Incollare la risposta restituita dal server: inizia con una riga di stato come \"HTTP/1.1 200 OK\"."),
         };
       }
-      notes.push(`The input starts with a request (${clip(request)}); it was skipped and the response after it was read.`);
+      notes.push(L(`The input starts with a request (${clip(request)}); it was skipped and the response after it was read.`, `L'input inizia con una richiesta (${clip(request)}); è stata saltata ed è stata letta la risposta che segue.`));
       i = j;
     }
 
@@ -143,7 +143,7 @@
       if (status) {
         start = i + 1;
       } else if (STATUS_LINE_NO_REASON.test(lines[i].trim())) {
-        notes.push(`Line ${i + 1}: the status line "${clip(lines[i].trim())}" has no status code.`);
+        notes.push(L(`Line ${i + 1}: the status line "${clip(lines[i].trim())}" has no status code.`, `Riga ${i + 1}: la riga di stato "${clip(lines[i].trim())}" non ha un codice di stato.`));
         start = i + 1;
       }
       const section = parseFieldSection(lines, start);
@@ -154,7 +154,7 @@
         let j = section.end;
         while (j < lines.length && lines[j].trim() === '') j++;
         if (j < lines.length && statusOf(lines[j])) {
-          notes.push(`The informational "${clip(status.line)}" in front of the response was skipped.`);
+          notes.push(L(`The informational "${clip(status.line)}" in front of the response was skipped.`, `La risposta informativa "${clip(status.line)}" prima della risposta è stata saltata.`));
           i = j;
           continue;
         }
@@ -183,4 +183,4 @@
     headerMap,
     MAX_INPUT,
   });
-})(globalThis.HeaderAnalyzer = globalThis.HeaderAnalyzer || {});
+});

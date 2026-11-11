@@ -9,7 +9,7 @@
  *     `parseSfItem` and `parseSfDictionary`, following the RFC's own parsing
  *     algorithms step by step, including the steps that condemn a whole field.
  */
-(function (HL) {
+globalThis.HeaderAnalyzer.i18n.module(function (HL, L) {
   'use strict';
 
   /** Strip optional whitespace (SP / HTAB, RFC 9110 §5.6.3): nothing else. */
@@ -107,8 +107,8 @@
       const item = this.item();
       this.skip(' ');
       if (!this.atEnd()) {
-        if (this.peek() === ',') throw new SfError('it carries more than one value');
-        throw new SfError(`unexpected '${this.peek()}' after the value`);
+        if (this.peek() === ',') throw new SfError(L('it carries more than one value', 'contiene più di un valore'));
+        throw new SfError(L(`unexpected '${this.peek()}' after the value`, `'${this.peek()}' inatteso dopo il valore`));
       }
       return item;
     }
@@ -130,9 +130,9 @@
         out.set(key, member);
         this.skip(' \t');
         if (this.atEnd()) return out;
-        if (this.take() !== ',') throw new SfError(`'${key}' is not followed by a comma`);
+        if (this.take() !== ',') throw new SfError(L(`'${key}' is not followed by a comma`, `'${key}' non è seguito da una virgola`));
         this.skip(' \t');
-        if (this.atEnd()) throw new SfError('it ends with a comma');
+        if (this.atEnd()) throw new SfError(L('it ends with a comma', 'termina con una virgola'));
       }
       return out;
     }
@@ -141,7 +141,7 @@
     key() {
       const c = this.peek();
       if (!c || !KEY_START.includes(c)) {
-        throw new SfError(`'${c || ' '}' cannot start a name (names are lowercase)`);
+        throw new SfError(L(`'${c || ' '}' cannot start a name (names are lowercase)`, `'${c || ' '}' non può iniziare un nome (i nomi sono in minuscolo)`));
       }
       let out = '';
       while (!this.atEnd() && KEY_CHARS.includes(this.peek())) out += this.take();
@@ -158,15 +158,15 @@
       const items = [];
       for (;;) {
         this.skip(' ');
-        if (this.atEnd()) throw new SfError('a list is missing its closing parenthesis');
+        if (this.atEnd()) throw new SfError(L('a list is missing its closing parenthesis', 'a un elenco manca la parentesi di chiusura'));
         if (this.peek() === ')') {
           this.take();
           return [items, this.parameters()];
         }
         items.push(this.item());
-        if (this.atEnd()) throw new SfError('a list is missing its closing parenthesis');
+        if (this.atEnd()) throw new SfError(L('a list is missing its closing parenthesis', 'a un elenco manca la parentesi di chiusura'));
         if (this.peek() !== ' ' && this.peek() !== ')') {
-          throw new SfError('a list item is not separated by a space');
+          throw new SfError(L('a list item is not separated by a space', 'un elemento di un elenco non è separato da uno spazio'));
         }
       }
     }
@@ -179,7 +179,7 @@
     /** §4.2.3.1: typed, so callers can tell a wrong type from a syntax error. */
     bareItem() {
       const c = this.peek();
-      if (!c) throw new SfError('a value is missing');
+      if (!c) throw new SfError(L('a value is missing', 'manca un valore'));
       if (c === '"') return { type: 'string', value: this.string() };
       if (c === ':') return { type: 'bytes', value: this.byteSequence() };
       if (c === '?') return { type: 'boolean', value: this.boolean() };
@@ -187,7 +187,7 @@
       if (c === '%') return { type: 'displaystring', value: this.displayString() };
       if (c === '-' || DIGITS.includes(c)) return this.number();
       if (TOKEN_START.includes(c)) return { type: 'token', value: this.token() };
-      throw new SfError(`'${c}' cannot start a value`);
+      throw new SfError(L(`'${c}' cannot start a value`, `'${c}' non può iniziare un valore`));
     }
 
     /** §4.2.3.2 */
@@ -213,25 +213,25 @@
       let type = 'integer';
       let out = '';
       if (this.peek() === '-') out += this.take();
-      if (!DIGITS.includes(this.peek()) || this.atEnd()) throw new SfError('a number is missing its digits');
+      if (!DIGITS.includes(this.peek()) || this.atEnd()) throw new SfError(L('a number is missing its digits', 'a un numero mancano le cifre'));
       while (!this.atEnd()) {
         const c = this.peek();
         if (DIGITS.includes(c)) {
           out += this.take();
         } else if (type === 'integer' && c === '.') {
-          if (out.replace('-', '').length > 12) throw new SfError('a decimal has too many digits');
+          if (out.replace('-', '').length > 12) throw new SfError(L('a decimal has too many digits', 'un decimale ha troppe cifre'));
           out += this.take();
           type = 'decimal';
         } else {
           break;
         }
         const digits = out.replace('-', '').replace('.', '').length;
-        if (type === 'integer' && digits > 15) throw new SfError('an integer has too many digits');
-        if (type === 'decimal' && digits > 16) throw new SfError('a decimal has too many digits');
+        if (type === 'integer' && digits > 15) throw new SfError(L('an integer has too many digits', 'un intero ha troppe cifre'));
+        if (type === 'decimal' && digits > 16) throw new SfError(L('a decimal has too many digits', 'un decimale ha troppe cifre'));
       }
       if (type === 'decimal') {
-        if (out.endsWith('.')) throw new SfError('a decimal ends with a dot');
-        if (out.length - out.indexOf('.') - 1 > 3) throw new SfError('a decimal has too many fractional digits');
+        if (out.endsWith('.')) throw new SfError(L('a decimal ends with a dot', 'un decimale termina con un punto'));
+        if (out.length - out.indexOf('.') - 1 > 3) throw new SfError(L('a decimal has too many fractional digits', 'un decimale ha troppe cifre dopo la virgola'));
       }
       return { type: type, value: Number(out) };
     }
@@ -243,19 +243,19 @@
       while (!this.atEnd()) {
         const c = this.take();
         if (c === '\\') {
-          if (this.atEnd()) throw new SfError('a quoted string ends inside an escape');
+          if (this.atEnd()) throw new SfError(L('a quoted string ends inside an escape', 'una stringa tra virgolette termina dentro un escape'));
           const n = this.take();
-          if (n !== '\\' && n !== '"') throw new SfError('a quoted string contains an invalid escape');
+          if (n !== '\\' && n !== '"') throw new SfError(L('a quoted string contains an invalid escape', 'una stringa tra virgolette contiene un escape non valido'));
           out += n;
         } else if (c === '"') {
           return out;
         } else if (c < ' ' || c > '~') {
-          throw new SfError('a quoted string contains an invalid character');
+          throw new SfError(L('a quoted string contains an invalid character', 'una stringa tra virgolette contiene un carattere non valido'));
         } else {
           out += c;
         }
       }
-      throw new SfError('a quoted string is missing its closing quote');
+      throw new SfError(L('a quoted string is missing its closing quote', 'a una stringa tra virgolette manca la virgoletta di chiusura'));
     }
 
     /** §4.2.6 */
@@ -272,10 +272,10 @@
       while (!this.atEnd()) {
         const c = this.take();
         if (c === ':') return out;
-        if (!BASE64.includes(c)) throw new SfError('a byte sequence contains an invalid character');
+        if (!BASE64.includes(c)) throw new SfError(L('a byte sequence contains an invalid character', 'una sequenza di byte contiene un carattere non valido'));
         out += c;
       }
-      throw new SfError('a byte sequence is missing its closing colon');
+      throw new SfError(L('a byte sequence is missing its closing colon', 'a una sequenza di byte mancano i due punti di chiusura'));
     }
 
     /** §4.2.8 */
@@ -284,36 +284,36 @@
       const c = this.take();
       if (c === '1') return true;
       if (c === '0') return false;
-      throw new SfError("'?' must be followed by 0 or 1");
+      throw new SfError(L("'?' must be followed by 0 or 1", "'?' deve essere seguito da 0 o 1"));
     }
 
     /** §4.2.9 */
     date() {
       this.take(); // '@'
       const n = this.number();
-      if (n.type !== 'integer') throw new SfError('a date must be an integer');
+      if (n.type !== 'integer') throw new SfError(L('a date must be an integer', 'una data deve essere un intero'));
       return n.value;
     }
 
     /** §4.2.10: only its well-formedness matters here. */
     displayString() {
       this.take(); // '%'
-      if (this.take() !== '"') throw new SfError("'%' must be followed by a quoted string");
+      if (this.take() !== '"') throw new SfError(L("'%' must be followed by a quoted string", "'%' deve essere seguito da una stringa tra virgolette"));
       let out = '';
       while (!this.atEnd()) {
         const c = this.take();
-        if (c < ' ' || c > '~') throw new SfError('a display string contains an invalid character');
+        if (c < ' ' || c > '~') throw new SfError(L('a display string contains an invalid character', 'una display string contiene un carattere non valido'));
         if (c === '"') return out;
         if (c === '%') {
           const hex = this.s.slice(this.i, this.i + 2);
-          if (!/^[0-9a-f]{2}$/.test(hex)) throw new SfError('a display string has an invalid escape');
+          if (!/^[0-9a-f]{2}$/.test(hex)) throw new SfError(L('a display string has an invalid escape', 'una display string ha un escape non valido'));
           this.i += 2;
           out += '%' + hex;
         } else {
           out += c;
         }
       }
-      throw new SfError('a display string is missing its closing quote');
+      throw new SfError(L('a display string is missing its closing quote', 'a una display string manca la virgoletta di chiusura'));
     }
   }
 
@@ -345,4 +345,4 @@
     parseSfItem,
     parseSfDictionary,
   });
-})(globalThis.HeaderAnalyzer = globalThis.HeaderAnalyzer || {});
+});

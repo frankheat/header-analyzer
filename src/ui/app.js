@@ -4,7 +4,7 @@
  * Rules this file keeps:
  *   - every piece of text that came from the input reaches the page through
  *     textContent or a text node, never through innerHTML;
- *   - the input is never persisted: only the profile, mode and appearance choices;
+ *   - the input is never persisted: only the profile, mode, language and appearance choices;
  *     what the user decides about findings to confirm lives in memory and is
  *     dropped with the report it belongs to;
  *   - a failure anywhere in rendering is caught and shown, never left as a
@@ -60,7 +60,7 @@
   function badge(severity, contingent) {
     return el('span', {
       className: `badge ${sevClass(severity)}${contingent ? ' contingent' : ''}`,
-      attrs: { title: contingent ? `${SEV_LABEL[severity]} if it applies, to confirm` : SEV_LABEL[severity] },
+      attrs: { title: contingent ? tr('ifApplies', SEV_LABEL[severity]) : SEV_LABEL[severity] },
     }, contingent ? icon('i-help', 'badge-icon') : null, SEV_LABEL[severity]);
   }
 
@@ -73,7 +73,7 @@
     if (contingent) return null;
     const n = r.findings.filter((f) => f.severity > Severity.OK && isContingent(f)).length;
     if (!n) return null;
-    const label = `${n} more finding${n === 1 ? '' : 's'} to confirm`;
+    const label = tr('moreToConfirm', n);
     return el('span', { className: 'badge contingent to-confirm-marker', attrs: { title: label, 'aria-label': label } },
       `+${n}`, icon('i-help', 'badge-icon'));
   }
@@ -83,11 +83,116 @@
     return el('span', { className: `avatar ${sevClass(severity)}` }, icon(contingent ? 'i-help' : SEV_ICON[severity]));
   }
 
+  // --------------------------------------------------------------- language
+  // The interface's own words. Findings, notes and the copied list come from
+  // the engine in the same language (HL.i18n.localized).
+
+  const UI_TEXT = {
+    en: {
+      langButton: 'IT', langSwitch: 'Passa all\'italiano',
+      skip: 'Skip to results', profile: 'Profile', basic: 'Basic', extended: 'Extended',
+      responseType: 'Response type', webPage: 'Web page', restApi: 'REST API', actions: 'Actions',
+      samples: 'Samples', loadSample: 'Load a sample response', response: 'Response', pasteRaw: 'Paste a raw HTTP response',
+      clear: 'Clear', clearInput: 'Clear the input', rawResponse: 'Raw HTTP response', results: 'Results',
+      toLight: 'Switch to light theme', toDark: 'Switch to dark theme',
+      profileHint: { basic: 'The core security headers: the standard review.', extended: 'Every header the analyzer knows, including legacy and deprecated ones.' },
+      modeHint: { page: 'The response is a page a browser displays', api: 'The response is a call to an API read by a browser (OWASP REST Security Cheat Sheet)' },
+      moreToConfirm: (n) => `${n} more finding${n === 1 ? '' : 's'} to confirm`,
+      ifApplies: (sev) => `${sev} if it applies, to confirm`,
+      analysisUpdated: (unconfirmed, sev, issues) => `Analysis updated. Overall ${unconfirmed ? 'unconfirmed ' : ''}${sev}. ${issues} header${issues === 1 ? '' : 's'} with issues.`,
+      drawFailedTitle: 'The report could not be displayed', drawFailed: 'Something went wrong while drawing the results. Your input is untouched.',
+      emptyTitle: 'No response yet', empty: 'Paste a raw HTTP response into the Response field. Header Analyzer reads its security headers the way a browser does and explains what each leaves open.',
+      trySample: 'Try a sample', technicalDetails: 'Technical details',
+      internalTitle: 'Header Analyzer hit an internal error', internal: 'This is a bug in Header Analyzer, not a verdict about the response. Please report it with the details below (they contain no part of your input).',
+      nothingToAnalyse: 'Nothing to analyse',
+      showAll: 'All findings', showAllDetail: 'Every header with a finding',
+      showConfirmed: 'Confirmed', showConfirmedDetail: 'Settled by the response, or checked by you',
+      showToConfirm: 'To confirm', showToConfirmDetail: 'Depend on a check the response cannot show',
+      copyFindings: 'Copy findings',
+      copiedAll: (n) => `${n} finding${n === 1 ? '' : 's'} copied`,
+      copiedConfirmed: (n) => `${n} confirmed finding${n === 1 ? '' : 's'} copied`,
+      copiedToConfirm: (n) => `${n} finding${n === 1 ? '' : 's'} to confirm copied`,
+      readingNotes: (n) => `Reading notes (${n})`,
+      show: 'Show', all: 'All', issues: 'Issues', toConfirm: 'To confirm', passing: 'Passing',
+      search: 'Search headers and findings',
+      noMatch: (q) => `No header or finding matches “${q}”.`, nothingInView: 'Nothing in this view.',
+      notPresent: 'Not present', emptyValue: 'Empty value', notSent: 'The response does not send this header.',
+      copyValue: 'Copy value', copyValueOf: (name) => `Copy the ${name} value`, valueCopied: 'Value copied',
+      correctAbsent: 'Not sending it is the correct state for this header.', nothingToReport: 'Nothing to report.',
+      confirmedManually: 'Confirmed manually', excluded: 'Excluded', confirmed: 'Confirmed', check: 'Check', recommendation: 'Recommendation',
+      fineIf: 'Fine if', problemIf: 'Problem if', confirmedIf: 'Confirmed if', excludedIf: 'Excluded if',
+      checkResult: 'Result of the check', markedConfirmed: 'Marked as confirmed', markedExcluded: 'Marked as excluded', backToConfirm: 'Back to confirm',
+      sources: (n) => `Sources (${n})`,
+      textToCopy: 'Text to copy', copyManually: 'Copy manually',
+      clipboardRefused: 'This page may not write to the clipboard. The text is selected: press Ctrl+C (⌘C on a Mac).', close: 'Close',
+      noFiles: 'Files are not opened: paste the response instead',
+      crashed: 'Something went wrong in Header Analyzer. Reload the page if it misbehaves.',
+    },
+    it: {
+      langButton: 'EN', langSwitch: 'Switch to English',
+      skip: 'Vai ai risultati', profile: 'Profilo', basic: 'Base', extended: 'Esteso',
+      responseType: 'Tipo di risposta', webPage: 'Pagina web', restApi: 'REST API', actions: 'Azioni',
+      samples: 'Esempi', loadSample: 'Carica una risposta di esempio', response: 'Risposta', pasteRaw: 'Incolla una risposta HTTP grezza',
+      clear: 'Svuota', clearInput: 'Svuota il campo', rawResponse: 'Risposta HTTP grezza', results: 'Risultati',
+      toLight: 'Passa al tema chiaro', toDark: 'Passa al tema scuro',
+      profileHint: { basic: 'Gli header di sicurezza principali: la revisione standard.', extended: 'Tutti gli header che lo strumento conosce, compresi quelli legacy e deprecati.' },
+      modeHint: { page: 'La risposta è una pagina visualizzata da un browser', api: 'La risposta è una chiamata a un\'API letta da un browser (OWASP REST Security Cheat Sheet)' },
+      moreToConfirm: (n) => (n === 1 ? 'Un altro finding da confermare' : `Altri ${n} finding da confermare`),
+      ifApplies: (sev) => `${sev} se si applica, da confermare`,
+      analysisUpdated: (unconfirmed, sev, issues) => `Analisi aggiornata. Complessivo ${sev}${unconfirmed ? ', da confermare' : ''}. ${issues} header con problemi.`,
+      drawFailedTitle: 'Non è stato possibile mostrare il report', drawFailed: 'Qualcosa è andato storto mentre venivano mostrati i risultati. Il tuo input non è stato toccato.',
+      emptyTitle: 'Ancora nessuna risposta', empty: 'Incolla una risposta HTTP grezza nel campo Risposta. Header Analyzer legge i suoi header di sicurezza come fa un browser e spiega cosa lascia aperto ciascuno.',
+      trySample: 'Prova un esempio', technicalDetails: 'Dettagli tecnici',
+      internalTitle: 'Header Analyzer ha avuto un errore interno', internal: 'È un bug di Header Analyzer, non un giudizio sulla risposta. Segnalalo con i dettagli qui sotto (non contengono nulla del tuo input).',
+      nothingToAnalyse: 'Niente da analizzare',
+      showAll: 'Tutti i finding', showAllDetail: 'Ogni header con un finding',
+      showConfirmed: 'Confermati', showConfirmedDetail: 'Certi dalla risposta, o verificati da te',
+      showToConfirm: 'Da confermare', showToConfirmDetail: 'Dipendono da una verifica che la risposta non può mostrare',
+      copyFindings: 'Copia i finding',
+      copiedAll: (n) => (n === 1 ? '1 finding copiato' : `${n} finding copiati`),
+      copiedConfirmed: (n) => (n === 1 ? '1 finding confermato copiato' : `${n} finding confermati copiati`),
+      copiedToConfirm: (n) => (n === 1 ? '1 finding da confermare copiato' : `${n} finding da confermare copiati`),
+      readingNotes: (n) => `Note di lettura (${n})`,
+      show: 'Mostra', all: 'Tutti', issues: 'Problemi', toConfirm: 'Da confermare', passing: 'Superati',
+      search: 'Cerca header e finding',
+      noMatch: (q) => `Nessun header o finding corrisponde a “${q}”.`, nothingInView: 'Niente in questa vista.',
+      notPresent: 'Non presente', emptyValue: 'Valore vuoto', notSent: 'La risposta non invia questo header.',
+      copyValue: 'Copia il valore', copyValueOf: (name) => `Copia il valore di ${name}`, valueCopied: 'Valore copiato',
+      correctAbsent: 'Non inviarlo è lo stato corretto per questo header.', nothingToReport: 'Niente da riportare.',
+      confirmedManually: 'Confermato manualmente', excluded: 'Escluso', confirmed: 'Confermato', check: 'Verifica', recommendation: 'Raccomandazione',
+      fineIf: 'Nessun problema se', problemIf: 'Problema se', confirmedIf: 'Confermato se', excludedIf: 'Escluso se',
+      checkResult: 'Esito della verifica', markedConfirmed: 'Segnato come confermato', markedExcluded: 'Segnato come escluso', backToConfirm: 'Di nuovo da confermare',
+      sources: (n) => `Fonti (${n})`,
+      textToCopy: 'Testo da copiare', copyManually: 'Copia manualmente',
+      clipboardRefused: 'Questa pagina potrebbe non poter scrivere negli appunti. Il testo è selezionato: premi Ctrl+C (⌘C su Mac).', close: 'Chiudi',
+      noFiles: 'I file non vengono aperti: incolla invece la risposta',
+      crashed: 'Qualcosa è andato storto in Header Analyzer. Ricarica la pagina se si comporta in modo strano.',
+    },
+  };
+
+  /** The interface text for `key` in the current language; a function entry takes arguments. */
+  function tr(key, ...args) {
+    const v = UI_TEXT[state.lang][key];
+    return typeof v === 'function' ? v(...args) : v;
+  }
+
+  /** A saved choice wins; without one, Italian for an Italian browser and English otherwise. */
+  function initialLang() {
+    const saved = storage.get('lang');
+    if (HL.i18n.LANGS.includes(saved)) return saved;
+    const nav = (navigator.languages && navigator.languages[0]) || navigator.language || '';
+    return /^it\b/i.test(nav) ? 'it' : HL.i18n.DEFAULT_LANG;
+  }
+
+  /** The engine in the current language. */
+  const core = () => HL.i18n.localized(state.lang).engine;
+
   // -------------------------------------------------------------------- state
 
   const state = {
     profile: HL.profiles.getProfile(storage.get('profile')).id,
     mode: HL.profiles.getMode(storage.get('mode')).id,
+    lang: HL.i18n.DEFAULT_LANG,
     filter: 'all',
     query: '',
     report: null,
@@ -135,7 +240,7 @@
     const theme = currentTheme();
     if (savedTheme()) document.documentElement.setAttribute('data-theme', theme);
     else document.documentElement.removeAttribute('data-theme');
-    const label = theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme';
+    const label = theme === 'dark' ? tr('toLight') : tr('toDark');
     const b = $('theme-button');
     b.setAttribute('aria-label', label);
     b.title = label;
@@ -149,7 +254,7 @@
       const on = b.dataset.profile === state.profile;
       b.setAttribute('aria-checked', String(on));
       b.tabIndex = on ? 0 : -1;
-      b.title = HL.profiles.getProfile(b.dataset.profile).summary;
+      b.title = tr('profileHint')[b.dataset.profile];
     }
   }
 
@@ -164,17 +269,12 @@
   // ------------------------------------------------------------------- mode
   // What the response is: the user's choice, never guessed from the response.
 
-  const MODE_HINT = {
-    page: 'The response is a page a browser displays',
-    api: 'The response is a call to an API read by a browser (OWASP REST Security Cheat Sheet)',
-  };
-
   function applyMode() {
     for (const b of document.querySelectorAll('#mode-control [data-mode]')) {
       const on = b.dataset.mode === state.mode;
       b.setAttribute('aria-checked', String(on));
       b.tabIndex = on ? 0 : -1;
-      b.title = MODE_HINT[b.dataset.mode];
+      b.title = tr('modeHint')[b.dataset.mode];
     }
   }
 
@@ -259,20 +359,21 @@
     debounce = setTimeout(() => runAnalysis(false), size > 200000 ? 350 : 120);
   }
 
-  function runAnalysis(force) {
+  /** `keepDecisions`: the same response read again in another language, so the checks recorded still apply. */
+  function runAnalysis(force, keepDecisions) {
     const text = $('input').value;
     $('clear-button').disabled = text === '';
     if (!force && text === state.lastInput) return;
     state.lastInput = text;
 
-    const report = HL.engine.analyze(text, state.profile, state.mode);
+    const report = core().analyze(text, state.profile, state.mode);
     state.report = report;
-    state.decisions.clear();
+    if (!keepDecisions) state.decisions.clear();
     render();
     if (report.ok) {
       const s = report.summary;
       const issues = report.results.filter((r) => worstSeverity(r) >= Severity.LOW).length;
-      announce(`Analysis updated. Overall ${s.worstIsContingent ? 'unconfirmed ' : ''}${SEV_LABEL[s.worst]}. ${issues} header${issues === 1 ? '' : 's'} with issues.`);
+      announce(tr('analysisUpdated', s.worstIsContingent, SEV_LABEL[s.worst], issues));
     }
   }
 
@@ -283,20 +384,20 @@
     try {
       root.replaceChildren(...buildResults(state.report));
     } catch (e) {
-      root.replaceChildren(errorState('The report could not be displayed', 'Something went wrong while drawing the results. Your input is untouched.', e && e.stack ? e.stack : String(e)));
+      root.replaceChildren(errorState(tr('drawFailedTitle'), tr('drawFailed'), e && e.stack ? e.stack : String(e)));
     }
   }
 
   function emptyState() {
     return el('div', { className: 'card empty-state' },
       el('span', { className: 'empty-icon' }, icon('i-inbox')),
-      el('h3', { text: 'No response yet' }),
-      el('p', { text: 'Paste a raw HTTP response into the Response field. Header Analyzer reads its security headers the way a browser does and explains what each leaves open.' }),
+      el('h3', { text: tr('emptyTitle') }),
+      el('p', { text: tr('empty') }),
       el('button', {
         className: 'filled-button',
         attrs: { type: 'button' },
         on: { click: () => loadText(HL.samples.find((x) => x.id === 'legacy').text) },
-      }, icon('i-sparkles'), 'Try a sample'));
+      }, icon('i-sparkles'), tr('trySample')));
   }
 
   function errorState(title, message, detail) {
@@ -304,19 +405,19 @@
       el('span', { className: 'empty-icon' }, icon('i-error')),
       el('h3', { text: title }),
       el('p', { text: message }),
-      detail ? el('details', null, el('summary', { text: 'Technical details' }), el('pre', { text: detail })) : null);
+      detail ? el('details', null, el('summary', { text: tr('technicalDetails') }), el('pre', { text: detail })) : null);
   }
 
   function buildResults(report) {
     if (!report || report.error === 'empty') return [emptyState()];
     if (report.error === 'internal') {
-      return [errorState('Header Analyzer hit an internal error', 'This is a bug in Header Analyzer, not a verdict about the response. Please report it with the details below (they contain no part of your input).', firstLine(report.detail))];
+      return [errorState(tr('internalTitle'), tr('internal'), firstLine(report.detail))];
     }
-    if (!report.ok) return [errorState('Nothing to analyse', report.error)];
+    if (!report.ok) return [errorState(tr('nothingToAnalyse'), report.error)];
 
     const nodes = [];
     if (report.notes.length) nodes.push(notesCard(report.notes));
-    const view = HL.engine.resolve(report, state.decisions);
+    const view = core().resolve(report, state.decisions);
     nodes.push(filterBar(report, view));
     nodes.push(...listSections(report, view));
     return nodes;
@@ -332,29 +433,28 @@
    * settles, or only those to confirm.
    */
   const LIST_SHOW = [
-    ['all', 'All findings', 'Every header with a finding'],
-    ['confirmed', 'Confirmed', 'Settled by the response, or checked by you'],
-    ['toConfirm', 'To confirm', 'Depend on a check the response cannot show'],
+    ['all', 'showAll', 'showAllDetail'],
+    ['confirmed', 'showConfirmed', 'showConfirmedDetail'],
+    ['toConfirm', 'showToConfirm', 'showToConfirmDetail'],
   ];
 
   function copyMenu(report) {
     const button = el('button', {
       className: 'tonal-button',
       attrs: { type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-controls': 'copy-menu', id: 'copy-button' },
-    }, icon('i-copy'), 'Copy findings', icon('i-expand', 'trailing'));
+    }, icon('i-copy'), tr('copyFindings'), icon('i-expand', 'trailing'));
     const menu = el('div', { className: 'menu', attrs: { id: 'copy-menu', role: 'menu', 'aria-labelledby': 'copy-button' } });
     menu.hidden = true;
     for (const [id, label, detail] of LIST_SHOW) {
-      const count = HL.engine.findingList(report, { show: id }).length;
+      const count = core().findingList(report, { show: id }).length;
       menu.append(el('button', {
         className: 'two-line',
         attrs: { type: 'button', role: 'menuitem', 'data-show': id, disabled: !count },
-      }, el('span', null, `${label} · ${count}`, el('span', { className: 'menu-detail', text: detail }))));
+      }, el('span', null, `${tr(label)} · ${count}`, el('span', { className: 'menu-detail', text: tr(detail) }))));
     }
     initMenu(button, menu, (item) => {
-      const lines = HL.engine.findingList(report, { show: item.dataset.show });
-      const n = `${lines.length} finding${lines.length === 1 ? '' : 's'}`;
-      const done = { all: `${n} copied`, confirmed: `${lines.length} confirmed finding${lines.length === 1 ? '' : 's'} copied`, toConfirm: `${n} to confirm copied` }[item.dataset.show];
+      const lines = core().findingList(report, { show: item.dataset.show });
+      const done = { all: tr('copiedAll', lines.length), confirmed: tr('copiedConfirmed', lines.length), toConfirm: tr('copiedToConfirm', lines.length) }[item.dataset.show];
       copyText(lines.map((l) => `- ${l.text}`).join('\n'), done);
     });
     return el('div', { className: 'menu-anchor copy-anchor' }, button, menu);
@@ -362,7 +462,7 @@
 
   function notesCard(notes) {
     const details = el('details', { className: 'card notes' },
-      el('summary', null, icon('i-info', 'lead'), el('span', { text: `Reading notes (${notes.length})` }), icon('i-expand', 'chev')),
+      el('summary', null, icon('i-info', 'lead'), el('span', { text: tr('readingNotes', notes.length) }), icon('i-expand', 'chev')),
       el('ul', null, notes.map((n) => el('li', { text: n }))));
     if (notes.some((n) => /request|informational/.test(n))) details.open = true;
     return details;
@@ -391,8 +491,8 @@
       confirm: report.results.filter((r) => r.findings.some(isContingent)).length,
     };
     // M3 filter chips behaving as a single-choice group.
-    const chips = el('div', { className: 'chip-set', attrs: { role: 'radiogroup', 'aria-label': 'Show' } });
-    for (const [id, label] of [['all', 'All'], ['issues', 'Issues'], ['confirm', 'To confirm']]) {
+    const chips = el('div', { className: 'chip-set', attrs: { role: 'radiogroup', 'aria-label': tr('show') } });
+    for (const [id, label] of [['all', tr('all')], ['issues', tr('issues')], ['confirm', tr('toConfirm')]]) {
       chips.append(el('button', {
         className: 'filter-chip',
         attrs: { type: 'button', role: 'radio', 'aria-checked': String(state.filter === id), tabindex: state.filter === id ? 0 : -1, 'data-filter': id },
@@ -407,12 +507,12 @@
     });
 
     const input = el('input', {
-      attrs: { type: 'search', placeholder: 'Search headers and findings', 'aria-label': 'Search headers and findings', value: state.query, id: 'search-input', autocomplete: 'off', spellcheck: 'false' },
+      attrs: { type: 'search', placeholder: tr('search'), 'aria-label': tr('search'), value: state.query, id: 'search-input', autocomplete: 'off', spellcheck: 'false' },
     });
     input.addEventListener('input', () => {
       state.query = input.value.trim();
       for (const n of document.querySelectorAll('.result-section')) n.remove();
-      $('results-root').append(...listSections(state.report, HL.engine.resolve(state.report, state.decisions)));
+      $('results-root').append(...listSections(state.report, core().resolve(state.report, state.decisions)));
     });
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && input.value) { e.stopPropagation(); input.value = ''; input.dispatchEvent(new Event('input')); }
@@ -429,11 +529,11 @@
       .sort((a, b) => b.worst - a.worst || a.order - b.order);
 
     if (!rows.length) {
-      return [el('div', { className: 'card no-match result-section', text: state.query ? `No header or finding matches “${state.query}”.` : 'Nothing in this view.' })];
+      return [el('div', { className: 'card no-match result-section', text: state.query ? tr('noMatch', state.query) : tr('nothingInView') })];
     }
     const bands = [
-      ['Issues', (w) => w >= Severity.LOW],
-      ['Passing', (w) => w === Severity.OK],
+      [tr('issues'), (w) => w >= Severity.LOW],
+      [tr('passing'), (w) => w === Severity.OK],
     ];
     const out = [];
     for (const [title, test] of bands) {
@@ -457,27 +557,27 @@
       avatar(worst, contingent),
       el('div', { className: 'row-text' },
         el('div', { className: 'row-name', text: r.name }),
-        el('div', { className: `row-value${absent || empty ? ' absent' : ''}`, text: absent ? 'Not present' : empty ? 'Empty value' : r.value })),
+        el('div', { className: `row-value${absent || empty ? ' absent' : ''}`, text: absent ? tr('notPresent') : empty ? tr('emptyValue') : r.value })),
       el('span', { className: 'row-badges' }, badge(worst, contingent), toConfirmMarker(r, contingent)),
       icon('i-expand', 'row-chevron'));
 
     const detail = el('div', { className: 'row-detail' });
     if (absent) {
-      detail.append(el('div', { className: 'value-block absent', text: 'The response does not send this header.' }));
+      detail.append(el('div', { className: 'value-block absent', text: tr('notSent') }));
     } else {
       detail.append(el('div', { className: 'value-block' },
         el('code', { text: empty ? '(empty)' : r.value }),
         el('button', {
           className: 'icon-button small',
-          attrs: { type: 'button', title: 'Copy value', 'aria-label': `Copy the ${r.name} value` },
-          on: { click: () => copyText(r.value, 'Value copied') },
+          attrs: { type: 'button', title: tr('copyValue'), 'aria-label': tr('copyValueOf', r.name) },
+          on: { click: () => copyText(r.value, tr('valueCopied')) },
         }, icon('i-copy'))));
     }
-    const indexed = raw.findings.map((f, i) => ({ f, key: HL.engine.decisionKey(raw, i) }));
+    const indexed = raw.findings.map((f, i) => ({ f, key: core().decisionKey(raw, i) }));
     const shown = indexed.filter(({ f }) => f.severity > Severity.OK || f.description || f.recommendation);
     const findings = (shown.length ? shown : indexed).slice().sort((a, b) => b.f.severity - a.f.severity);
     if (!findings.length) {
-      detail.append(el('p', { className: 'finding-desc', text: absent ? 'Not sending it is the correct state for this header.' : 'Nothing to report.' }));
+      detail.append(el('p', { className: 'finding-desc', text: absent ? tr('correctAbsent') : tr('nothingToReport') }));
     }
     for (const { f, key } of findings) detail.append(findingNode(f, key));
 
@@ -489,7 +589,7 @@
     return details;
   }
 
-  const DECISION_LABEL = { confirmed: 'Confirmed manually', excluded: 'Excluded' };
+  const DECISION_LABEL = { confirmed: 'confirmedManually', excluded: 'excluded' };
 
   /**
    * A finding with a severity carries its badge; an OK finding is a note:
@@ -506,14 +606,14 @@
         el('span', { className: 'finding-title', text: f.title })));
     if (f.description) node.append(el('p', { className: 'finding-desc', text: f.description }));
     if (f.verify) {
-      const label = note ? 'Check' : DECISION_LABEL[decision] || 'To confirm';
+      const label = note ? tr('check') : tr(DECISION_LABEL[decision] || 'toConfirm');
       node.append(el('div', { className: 'callout verify' }, icon(decision === 'confirmed' ? 'i-check' : 'i-help'),
         el('div', null, el('span', { className: 'callout-label', text: label }), el('p', { className: 'check-question', text: f.verify }), outcomes(f, note))));
     }
     if (contingent) node.append(decisionChips(key, decision));
     if (f.recommendation) {
       node.append(el('div', { className: 'callout rec' }, icon('i-bulb'),
-        el('div', null, el('span', { className: 'callout-label', text: 'Recommendation' }), f.recommendation)));
+        el('div', null, el('span', { className: 'callout-label', text: tr('recommendation') }), f.recommendation)));
     }
     if (f.sources.length) node.append(sourcesNode(f.sources));
     return node;
@@ -526,16 +626,16 @@
    */
   function outcomes(f, note) {
     const rows = note
-      ? [['i-check', 'Fine if', f.excludeIf], ['i-close', 'Problem if', f.confirmIf]]
-      : [['i-check', 'Confirmed if', f.confirmIf], ['i-close', 'Excluded if', f.excludeIf]];
+      ? [['i-check', tr('fineIf'), f.excludeIf], ['i-close', tr('problemIf'), f.confirmIf]]
+      : [['i-check', tr('confirmedIf'), f.confirmIf], ['i-close', tr('excludedIf'), f.excludeIf]];
     return el('ul', { className: 'check-outcomes' }, rows.filter(([, , text]) => text).map(([ic, label, text]) =>
       el('li', null, icon(ic), el('span', null, el('strong', { text: `${label}: ` }), text))));
   }
 
   /** Two toggles under a finding to confirm; pressing the active one again reopens it. */
   function decisionChips(key, decision) {
-    const set = el('div', { className: 'chip-set decision-set', attrs: { role: 'group', 'aria-label': 'Result of the check' } });
-    for (const [value, label] of [['confirmed', 'Confirmed'], ['excluded', 'Excluded']]) {
+    const set = el('div', { className: 'chip-set decision-set', attrs: { role: 'group', 'aria-label': tr('checkResult') } });
+    for (const [value, label] of [['confirmed', tr('confirmed')], ['excluded', tr('excluded')]]) {
       set.append(el('button', {
         className: 'filter-chip',
         attrs: { type: 'button', 'aria-pressed': String(decision === value), 'data-decision': `${key}|${value}` },
@@ -550,7 +650,7 @@
     render();
     const again = document.querySelector(`[data-decision="${CSS.escape(key)}|${value || 'confirmed'}"]`);
     if (again) again.focus();
-    announce(value ? `Marked as ${value}` : 'Back to confirm');
+    announce(value === 'confirmed' ? tr('markedConfirmed') : value === 'excluded' ? tr('markedExcluded') : tr('backToConfirm'));
   }
 
   /**
@@ -568,7 +668,7 @@
         el('q', { className: 'source-quote', text: c.quote }));
     });
     return el('details', { className: 'sources' },
-      el('summary', null, icon('i-expand', 'chev'), el('span', { text: `Sources (${ids.length})` })),
+      el('summary', null, icon('i-expand', 'chev'), el('span', { text: tr('sources', ids.length) })),
       el('ol', null, items));
   }
 
@@ -597,14 +697,14 @@
 
   /** Last resort: the text in a dialog, already selected, to copy by hand. */
   function manualCopy(text) {
-    const area = el('textarea', { className: 'manual-copy-text', attrs: { readonly: true, rows: 10, 'aria-label': 'Text to copy' } });
+    const area = el('textarea', { className: 'manual-copy-text', attrs: { readonly: true, rows: 10, 'aria-label': tr('textToCopy') } });
     area.value = text;
     const dialog = el('dialog', { className: 'manual-copy', attrs: { 'aria-labelledby': 'manual-copy-title' } },
-      el('h3', { text: 'Copy manually', attrs: { id: 'manual-copy-title' } }),
-      el('p', { className: 'subtitle', text: 'This page may not write to the clipboard. The text is selected: press Ctrl+C (⌘C on a Mac).' }),
+      el('h3', { text: tr('copyManually'), attrs: { id: 'manual-copy-title' } }),
+      el('p', { className: 'subtitle', text: tr('clipboardRefused') }),
       area,
       el('div', { className: 'dialog-actions' },
-        el('button', { className: 'filled-button', text: 'Close', attrs: { type: 'button' }, on: { click: () => dialog.close() } })));
+        el('button', { className: 'filled-button', text: tr('close'), attrs: { type: 'button' }, on: { click: () => dialog.close() } })));
     dialog.addEventListener('close', () => dialog.remove());
     document.body.append(dialog);
     dialog.showModal();
@@ -624,7 +724,48 @@
 
   // ------------------------------------------------------------------- init
 
+  /** The samples menu, in the current language. */
+  function fillSamples() {
+    $('samples-menu').replaceChildren(...HL.samples.map((s) => {
+      const label = (s.label && s.label[state.lang]) || s.label.en;
+      return el('button', { className: 'two-line', attrs: { type: 'button', role: 'menuitem', 'data-sample': s.id } },
+        icon('i-sparkles'), el('span', null, label.name, el('span', { className: 'menu-detail', text: label.detail })));
+    }));
+  }
+
+  /**
+   * The static page in the current language: elements carry data-i18n (their
+   * text) or data-i18n-attr ("attribute:key; ..."), keys of UI_TEXT.
+   */
+  function applyLanguage() {
+    document.documentElement.lang = state.lang;
+    for (const n of document.querySelectorAll('[data-i18n]')) n.textContent = tr(n.dataset.i18n);
+    for (const n of document.querySelectorAll('[data-i18n-attr]')) {
+      for (const pair of n.dataset.i18nAttr.split(';')) {
+        const [attr, key] = pair.split(':').map((x) => x.trim());
+        if (attr && key) n.setAttribute(attr, tr(key));
+      }
+    }
+    const b = $('lang-button');
+    b.querySelector('.lang-code').textContent = tr('langButton');
+    b.setAttribute('aria-label', tr('langSwitch'));
+    b.title = tr('langSwitch');
+    applyTheme();
+    applyProfile();
+    applyMode();
+    fillSamples();
+  }
+
+  function setLang(lang) {
+    state.lang = HL.i18n.LANGS.includes(lang) ? lang : HL.i18n.DEFAULT_LANG;
+    storage.set('lang', state.lang);
+    applyLanguage();
+    runAnalysis(true, true);
+  }
+
   function init() {
+    state.lang = initialLang();
+    applyLanguage();
     applyTheme();
     applyProfile();
     applyMode();
@@ -636,10 +777,7 @@
     initSegmented($('mode-control'), (b) => setMode(b.dataset.mode));
 
     const samplesMenu = $('samples-menu');
-    for (const s of HL.samples) {
-      samplesMenu.append(el('button', { className: 'two-line', attrs: { type: 'button', role: 'menuitem', 'data-sample': s.id } },
-        icon('i-sparkles'), el('span', null, s.name, el('span', { className: 'menu-detail', text: s.detail }))));
-    }
+    fillSamples();
     initMenu($('samples-button'), samplesMenu, (item) => {
       const s = HL.samples.find((x) => x.id === item.dataset.sample);
       if (s) {
@@ -647,6 +785,7 @@
         loadText(s.text);
       }
     });
+    $('lang-button').addEventListener('click', () => setLang(state.lang === 'it' ? 'en' : 'it'));
     $('theme-button').addEventListener('click', () => {
       storage.set('theme', currentTheme() === 'dark' ? 'light' : 'dark');
       applyTheme();
@@ -662,7 +801,7 @@
     window.addEventListener('drop', (e) => {
       if (!isFileDrag(e)) return;
       e.preventDefault();
-      toast('Files are not opened: paste the response instead');
+      toast(tr('noFiles'));
     });
 
     document.addEventListener('keydown', (e) => {
@@ -683,7 +822,7 @@
 
     window.addEventListener('error', (e) => {
       // Something escaped every handler: say so rather than fail silently.
-      toast('Something went wrong in Header Analyzer. Reload the page if it misbehaves.');
+      toast(tr('crashed'));
       if (window.console) console.error(e.error || e.message);
     });
 

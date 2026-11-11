@@ -6,7 +6,7 @@
  * analyse, or when the engine itself failed, which is reported as such rather
  * than as a verdict about the response.
  */
-(function (HL) {
+globalThis.HeaderAnalyzer.i18n.module(function (HL, L) {
   'use strict';
 
   const { Severity, SEVERITY_NAMES, Status, isContingent } = HL.models;
@@ -57,7 +57,7 @@
       if (parsed.error) return failure(parsed.error, Object.assign(meta, { notes: parsed.notes }));
       const response = parsed.response;
       if (!response || response.fields.length === 0) {
-        return failure('No HTTP header fields were found. Paste a raw response: a status line such as "HTTP/1.1 200 OK", then one "Name: value" per line.', meta);
+        return failure(L('No HTTP header fields were found. Paste a raw response: a status line such as "HTTP/1.1 200 OK", then one "Name: value" per line.', "Non è stato trovato nessun campo di header HTTP. Incollare una risposta grezza: una riga di stato come \"HTTP/1.1 200 OK\", poi un \"Nome: valore\" per riga."), meta);
       }
 
       const notes = [...parsed.notes, ...response.notes];
@@ -78,6 +78,13 @@
   // When one header has problems of several kinds, the line carries the status
   // of the most severe; on a tie, the first of these.
   const STATUS_PRECEDENCE = [Status.MISSING, Status.MISCONFIGURED, Status.DEPRECATED, Status.DUPLICATED];
+  // The words the list is written with: in Italian, those of the report template.
+  const STATUS_LABEL = {
+    [Status.MISSING]: L('Missing', 'Assente'),
+    [Status.MISCONFIGURED]: L('Misconfigured', 'Configurazione non corretta'),
+    [Status.DUPLICATED]: L('Duplicated', 'Duplicato'),
+    [Status.DEPRECATED]: L('Deprecated', 'Deprecato'),
+  };
   const MAX_BRIEFS = 3;
 
   /** "Sent 2 times" → "sent 2 times" inside a sentence; "SAMEORIGIN …" and "'none' …" stay. */
@@ -115,7 +122,7 @@
         if (f.status === Status.NONE || f.severity === Severity.OK) continue;
         const contingent = isContingent(f);
         if ((o.show === 'confirmed' && contingent) || (o.show === 'toConfirm' && !contingent)) continue;
-        const brief = f.brief + (contingent ? ' (to confirm)' : '');
+        const brief = f.brief + (contingent ? L(' (to confirm)', " (da confermare)") : '');
         if (seen.has(brief)) continue;          // two routes to the same problem
         seen.add(brief);
         items.push({ status: f.status, brief, severity: f.severity, toConfirm: contingent });
@@ -127,7 +134,7 @@
       const top = items[0];
       const shown = items.slice(0, MAX_BRIEFS).map((it, k) => (k === 0 ? it.brief : midSentence(it.brief)));
       const rest = items.length - shown.length;
-      const brief = shown.join('; ') + (rest > 0 ? `; and ${rest} more` : '');
+      const brief = shown.join('; ') + (rest > 0 ? L(`; and ${rest} more`, `; e altri ${rest}`) : '');
       lines.push({
         header: r.name,
         status: top.status,
@@ -135,7 +142,7 @@
         severity: SEVERITY_NAMES[top.severity],
         // Unconfirmed when nothing settled reaches the line's severity.
         toConfirm: items.filter((it) => it.severity === top.severity).every((it) => it.toConfirm),
-        text: `${r.name}: ${top.status}. ${brief}.`,
+        text: `${r.name}: ${STATUS_LABEL[top.status]}. ${brief}.`,
         items: items.map((it) => ({ ...it, severity: SEVERITY_NAMES[it.severity] })),
         rank: -top.severity,
         order,
@@ -174,4 +181,4 @@
   }
 
   HL.engine = Object.freeze({ analyze, findingList, resolve, decisionKey, VERSION });
-})(globalThis.HeaderAnalyzer = globalThis.HeaderAnalyzer || {});
+});

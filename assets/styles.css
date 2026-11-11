@@ -193,7 +193,7 @@ svg { fill: currentColor; }
 }
 .top-app-bar.scrolled { background: var(--md-surface-container); box-shadow: var(--elev-2); }
 .app-bar-title { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.app-bar-title h1 { font-size: 22px; line-height: 28px; letter-spacing: 0; }     /* title-large */
+.app-bar-title h1 { font-size: 22px; line-height: 28px; letter-spacing: 0; white-space: nowrap; }     /* title-large */
 /* Light/dark switch: the icon shows the theme a click switches to. */
 .theme-toggle .ic-light { display: none; }
 :root[data-theme="dark"] .theme-toggle .ic-light { display: block; }
@@ -508,13 +508,18 @@ svg { fill: currentColor; }
 
 /* ------------------------------------------------------------- Responsive */
 
+/* The bar's two selectors move to their own row before they crowd the title
+   (the Italian labels are the longest). */
+@media (max-width: 959px) {
+  .top-app-bar { flex-wrap: wrap; row-gap: 4px; padding-bottom: 12px; }
+  .top-app-bar .segmented { order: 3; width: 100%; }
+  .top-app-bar .segmented button { flex: 1; min-width: 0; }
+}
+
 /* M3 compact / medium window classes */
 @media (max-width: 839px) {
   .layout { grid-template-columns: minmax(0, 1fr); padding: 8px 16px 32px; gap: 16px; }
   .input-pane { position: static; }
-  .top-app-bar { flex-wrap: wrap; row-gap: 4px; padding-bottom: 12px; }
-  .top-app-bar .segmented { order: 3; width: 100%; }
-  .top-app-bar .segmented button { flex: 1; min-width: 0; }
   #input { height: 240px; }
   .row > summary { grid-template-columns: 40px minmax(0, 1fr) 24px; }
   .row > summary .row-badges { grid-column: 2; grid-row: 2; justify-self: start; }
@@ -544,3 +549,6 @@ svg { fill: currentColor; }
 .check-outcomes li { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 6px; align-items: start; }
 .check-outcomes svg { width: 16px; height: 16px; margin-top: 2px; }
 .check-outcomes strong { font-weight: 500; }
+
+/* Language switch: the code of the language a click switches to */
+.lang-code { font-size: 13px; font-weight: 600; line-height: 1; letter-spacing: 0.5px; }

@@ -10,8 +10,10 @@
   HL.samples = Object.freeze([
     {
       id: 'hardened',
-      name: 'Hardened site',
-      detail: 'Strict CSP, HSTS, isolation headers',
+      label: {
+        en: { name: 'Hardened site', detail: 'Strict CSP, HSTS, isolation headers' },
+        it: { name: 'Sito protetto', detail: 'CSP rigorosa, HSTS, header di isolamento' },
+      },
       text: join([
         'HTTP/2 200',
         'content-type: text/html; charset=utf-8',
@@ -34,8 +36,10 @@
     },
     {
       id: 'legacy',
-      name: 'Legacy application',
-      detail: 'Weak CSP, ALLOW-FROM, reflected CORS',
+      label: {
+        en: { name: 'Legacy application', detail: 'Weak CSP, ALLOW-FROM, reflected CORS' },
+        it: { name: 'Applicazione legacy', detail: 'CSP debole, ALLOW-FROM, CORS riflesso' },
+      },
       text: join([
         'HTTP/1.1 200 OK',
         'Date: Thu, 08 Oct 2026 09:12:44 GMT',
@@ -60,8 +64,10 @@
     {
       // Loading it also selects REST API mode: the sample is an API response.
       id: 'api',
-      name: 'REST API response',
-      detail: 'JSON with reflected CORS, no no-store',
+      label: {
+        en: { name: 'REST API response', detail: 'JSON with reflected CORS, no no-store' },
+        it: { name: 'Risposta di una REST API', detail: 'JSON con CORS riflesso, senza no-store' },
+      },
       mode: 'api',
       text: join([
         'HTTP/2 200',

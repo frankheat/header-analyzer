@@ -39,7 +39,7 @@
     <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M19 3H4.99C3.88 3 3.01 3.89 3.01 5L3 19c0 1.1.88 2 1.99 2H19c1.1 0 2-.9 2-2V5c0-1.11-.9-2-2-2zm0 12h-4c0 1.66-1.35 3-3 3s-3-1.34-3-3H4.99V5H19v10z"/></symbol>
   </svg>
 
-  <a class="skip-link" href="#results">Skip to results</a>
+  <a class="skip-link" href="#results" data-i18n="skip">Skip to results</a>
 
   <header class="top-app-bar" role="banner">
     <div class="app-bar-title">
@@ -47,23 +47,26 @@
       <h1>Header Analyzer</h1>
     </div>
 
-    <div class="segmented" role="radiogroup" aria-label="Profile" id="profile-control">
-      <button type="button" role="radio" data-profile="basic" aria-checked="true"><svg class="seg-check" aria-hidden="true"><use href="#i-check"></use></svg>Basic</button>
-      <button type="button" role="radio" data-profile="extended" aria-checked="false"><svg class="seg-check" aria-hidden="true"><use href="#i-check"></use></svg>Extended</button>
+    <div class="segmented" role="radiogroup" aria-label="Profile" data-i18n-attr="aria-label:profile" id="profile-control">
+      <button type="button" role="radio" data-profile="basic" aria-checked="true"><svg class="seg-check" aria-hidden="true"><use href="#i-check"></use></svg><span data-i18n="basic">Basic</span></button>
+      <button type="button" role="radio" data-profile="extended" aria-checked="false"><svg class="seg-check" aria-hidden="true"><use href="#i-check"></use></svg><span data-i18n="extended">Extended</span></button>
     </div>
 
-    <div class="segmented" role="radiogroup" aria-label="Response type" id="mode-control">
-      <button type="button" role="radio" data-mode="page" aria-checked="true"><svg class="seg-check" aria-hidden="true"><use href="#i-check"></use></svg>Web page</button>
-      <button type="button" role="radio" data-mode="api" aria-checked="false"><svg class="seg-check" aria-hidden="true"><use href="#i-check"></use></svg>REST API</button>
+    <div class="segmented" role="radiogroup" aria-label="Response type" data-i18n-attr="aria-label:responseType" id="mode-control">
+      <button type="button" role="radio" data-mode="page" aria-checked="true"><svg class="seg-check" aria-hidden="true"><use href="#i-check"></use></svg><span data-i18n="webPage">Web page</span></button>
+      <button type="button" role="radio" data-mode="api" aria-checked="false"><svg class="seg-check" aria-hidden="true"><use href="#i-check"></use></svg><span data-i18n="restApi">REST API</span></button>
     </div>
 
-    <nav class="app-bar-actions" aria-label="Actions">
+    <nav class="app-bar-actions" aria-label="Actions" data-i18n-attr="aria-label:actions">
       <div class="menu-anchor">
-        <button type="button" class="icon-button" id="samples-button" aria-haspopup="menu" aria-expanded="false" aria-controls="samples-menu" title="Samples" aria-label="Load a sample response">
+        <button type="button" class="icon-button" id="samples-button" aria-haspopup="menu" aria-expanded="false" aria-controls="samples-menu" title="Samples" aria-label="Load a sample response" data-i18n-attr="title:samples; aria-label:loadSample">
           <svg aria-hidden="true"><use href="#i-sparkles"></use></svg>
         </button>
         <div class="menu" id="samples-menu" role="menu" aria-labelledby="samples-button" hidden></div>
       </div>
+      <button type="button" class="icon-button lang-toggle" id="lang-button" title="Passa all'italiano" aria-label="Passa all'italiano">
+        <span class="lang-code" aria-hidden="true">IT</span>
+      </button>
       <button type="button" class="icon-button theme-toggle" id="theme-button" title="Switch to dark theme" aria-label="Switch to dark theme">
         <svg class="ic-dark" aria-hidden="true"><use href="#i-dark"></use></svg>
         <svg class="ic-light" aria-hidden="true"><use href="#i-light"></use></svg>
@@ -76,22 +79,22 @@
       <div class="card input-card">
         <div class="card-header">
           <div>
-            <h2 id="input-title">Response</h2>
-            <p class="subtitle">Paste a raw HTTP response</p>
+            <h2 id="input-title" data-i18n="response">Response</h2>
+            <p class="subtitle" data-i18n="pasteRaw">Paste a raw HTTP response</p>
           </div>
-          <button type="button" class="icon-button" id="clear-button" title="Clear" aria-label="Clear the input" disabled>
+          <button type="button" class="icon-button" id="clear-button" title="Clear" aria-label="Clear the input" data-i18n-attr="title:clear; aria-label:clearInput" disabled>
             <svg aria-hidden="true"><use href="#i-delete"></use></svg>
           </button>
         </div>
         <div class="text-field">
           <textarea id="input" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" wrap="off" placeholder=" "></textarea>
-          <label for="input">Raw HTTP response</label>
+          <label for="input" data-i18n="rawResponse">Raw HTTP response</label>
         </div>
       </div>
     </section>
 
     <section class="pane results-pane" id="results" aria-labelledby="results-title" tabindex="-1">
-      <h2 class="visually-hidden" id="results-title">Results</h2>
+      <h2 class="visually-hidden" id="results-title" data-i18n="results">Results</h2>
       <div id="results-root"></div>
     </section>
   </main>
@@ -99,6 +102,7 @@
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
   <div class="visually-hidden" id="announcer" aria-live="polite"></div>
 
+  <script src="src/core/i18n.js"></script>
   <script src="src/core/models.js"></script>
   <script src="src/core/sources.js"></script>
   <script src="src/core/fields.js"></script>
