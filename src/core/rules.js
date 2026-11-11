@@ -920,9 +920,9 @@
       if (r.item[0].value) return [finding(H, Severity.OK, 'Origin-Agent-Cluster: ?1 (origin-keyed agent cluster)', { sources: ['html-oac'] })];
       return [finding(H, ctx.absentSeverity, 'Origin-Agent-Cluster: ?0 opts out of origin keying', {
         brief: 'Origin keying is explicitly disabled',
-        description: 'Chrome and Edge make document.domain immutable by default since version 115, and ?0 is the opt-out that lets this page set it again: once it and a page on another subdomain of the same site both set document.domain, each can read and change the other\'s DOM. Other browsers act only on ?1 and treat ?0 as no header, where document.domain still works anyway.',
+        description: '?0 explicitly requests a site-keyed agent cluster, the setting that lets a page set document.domain: once it and a page on another subdomain of the same site both set it, each can read and change the other\'s DOM. Browsers are switching their default to origin-keyed (?1); where they have, as Chrome and Edge have since version 115, ?0 is what turns document.domain back on. Where the default is still site-keyed, ?0 changes nothing today, but keeps the page on the old behaviour once the default changes.',
         recommendation: 'Set Origin-Agent-Cluster: ?1, and replace any document.domain use with postMessage.',
-        sources: ['chrome-docdomain-opt-out', 'chrome-docdomain-115', 'mdn-docdomain-shared', 'mdn-oac-ignored'],
+        sources: ['mdn-oac-site', 'mdn-oac-default', 'chrome-docdomain-opt-out', 'chrome-docdomain-115', 'mdn-docdomain-shared'],
       })];
     }
     return [finding(H, ctx.absentSeverity, `Origin-Agent-Cluster: unrecognized value '${value}', ignored`, {
@@ -1227,8 +1227,19 @@
   // depth for a response that might be rendered as HTML. Headers outside it
   // keep their page rules, except those that only act on a document.
   // ---------------------------------------------------------------------------
-  const API_HTML_VERIFY = 'Can this API return HTML, now or in a later version (an error page, say)? If it never can, there is nothing here: the OWASP REST Security Cheat Sheet calls this header unnecessary then. If it can, or you cannot be sure, this stands.';
-  const API_DEFENCE_SOURCES = ['rest-dd', 'rest-dd-uncertain'];
+  // The cheat sheet's defence-in-depth headers only act on a response rendered
+  // as HTML. In this mode the response is an API response, so a gap in them is
+  // explained, never graded: asking whether the API might return HTML would
+  // reopen what the mode already settles.
+  const API_DEFENCE_SOURCES = ['rest-dd', 'rest-dd-never'];
+
+  function apiDefenceNote(header, title, what, setting, sources) {
+    return finding(header, Severity.OK, title, {
+      status: Status.NONE,
+      description: `${what} The OWASP REST Security Cheat Sheet lists this header as defence in depth for responses rendered as HTML, and an API response is not one, so there is nothing to report. ${setting} costs nothing if you want it anyway.`,
+      sources: [...sources, ...API_DEFENCE_SOURCES],
+    });
+  }
   const API_CT_REC = 'Declare the type the API returns, such as Content-Type: application/json';
   // MIME Sniffing: the JavaScript MIME types.
   const JS_TYPES = new Set(['application/ecmascript', 'application/javascript', 'application/x-ecmascript', 'application/x-javascript',
@@ -1260,13 +1271,10 @@
     if (view.defaultNone) {
       out.push(finding(H, Severity.OK, "CSP: default-src 'none' (the response may load nothing)", { sources: ['rest-csp-dd'] }));
     } else {
-      out.push(finding(H, Severity.LOW, view.defaultSrc === null ? "CSP: default-src 'none' is not set" : `CSP: default-src ${view.defaultSrc} instead of 'none'`, {
-        status: view.defaultSrc === null ? Status.MISSING : Status.MISCONFIGURED,
-        brief: "No default-src 'none' as defence in depth",
-        description: "If this response is ever rendered as HTML (through a wrong Content-Type, MIME sniffing or an HTML error page), default-src 'none' stops it loading or running anything, so markup injected into it goes nowhere. The OWASP REST Security Cheat Sheet lists it as defence in depth.",
-        verify: API_HTML_VERIFY,
-        sources: ['rest-csp-dd', ...API_DEFENCE_SOURCES],
-      }));
+      out.push(apiDefenceNote(H,
+        view.defaultSrc === null ? "CSP: default-src 'none' is not set (not needed on an API response)" : `CSP: default-src ${view.defaultSrc} instead of 'none' (not needed on an API response)`,
+        "default-src 'none' stops a response rendered as HTML from loading or running anything.",
+        "Content-Security-Policy: default-src 'none'", ['rest-csp-dd']));
     }
     return out;
   }
@@ -1372,7 +1380,6 @@
 
   function apiPermissionsPolicy(value, empty) {
     const H = 'Permissions-Policy';
-    const sources = ['rest-pp', ...API_DEFENCE_SOURCES];
     const parsed = value === null ? null : parseSfDictionary(value);
     if (parsed && parsed.ok) {
       // OK when every feature it names is closed with (), as in the cheat
@@ -1382,19 +1389,14 @@
         return origins === null || origins.length > 0;   // an invalid allowlist is dropped: the default applies
       }).map(([feature]) => feature).sort();
       if (!open.length) return [finding(H, Severity.OK, 'Permissions-Policy: every feature it names is disabled', { sources: ['rest-pp'] })];
-      return [finding(H, Severity.LOW, `Permissions-Policy: allows ${open.join(', ')}`, {
-        status: Status.MISCONFIGURED, brief: `${open.join(', ')} allowed`,
-        description: 'An API response has no use for these features. If it is ever rendered as HTML, the policy lets it, or what it embeds, use them. The OWASP REST Security Cheat Sheet lists this header as defence in depth, with an example that disables every feature with an empty allowlist ().',
-        verify: API_HTML_VERIFY,
-        sources,
-      })];
+      return [apiDefenceNote(H, `Permissions-Policy: allows ${open.join(', ')} (not needed on an API response)`,
+        'The policy restricts the browser features a response rendered as HTML could use.',
+        'Closing every feature with an empty allowlist (), as in the cheat sheet\'s example,', ['rest-pp'])];
     }
-    return [finding(H, Severity.LOW, value === null ? apiTitle(H, empty) : `Permissions-Policy: '${value}' is not a valid policy, so none is applied`, {
-      status: value === null ? apiStatus(empty) : Status.MISCONFIGURED, brief: 'Browser features are not restricted',
-      description: 'If this response is ever rendered as HTML, nothing restricts the browser features it could use. The OWASP REST Security Cheat Sheet lists this header as defence in depth, with an example policy that disables every feature.',
-      verify: API_HTML_VERIFY,
-      sources,
-    })];
+    return [apiDefenceNote(H, value === null ? (empty ? 'Permissions-Policy: present but empty (not needed on an API response)' : 'Permissions-Policy: not set (not needed on an API response)')
+      : `Permissions-Policy: '${value}' is not a valid policy (not needed on an API response)`,
+    'The policy restricts the browser features a response rendered as HTML could use.',
+    'A policy that closes every feature with (), as in the cheat sheet\'s example,', ['rest-pp'])];
   }
 
   function apiReferrerPolicy(value, empty) {
@@ -1406,14 +1408,11 @@
       }
     }
     if (n === 'no-referrer') return [finding(H, Severity.OK, 'Referrer-Policy: no-referrer', { sources: ['rest-rp', 'referrer-last'] })];
-    const title = value === null ? apiTitle(H, empty)
-      : n === '' ? `Referrer-Policy: unrecognized value '${value}', so no policy is in force` : `Referrer-Policy: '${n}' instead of no-referrer`;
-    return [finding(H, Severity.LOW, title, {
-      status: value === null ? apiStatus(empty) : Status.MISCONFIGURED, brief: 'no-referrer is not set',
-      description: 'A response that is not HTML triggers no further requests, so it has no referrer to send: the OWASP REST Security Cheat Sheet recommends no-referrer. It only matters if this response is ever rendered as HTML and loads or links to something.',
-      verify: API_HTML_VERIFY,
-      sources: ['rest-rp', ...API_DEFENCE_SOURCES],
-    })];
+    const title = value === null ? (empty ? 'Referrer-Policy: present but empty' : 'Referrer-Policy: not set')
+      : n === '' ? `Referrer-Policy: unrecognized value '${value}'` : `Referrer-Policy: '${n}' instead of no-referrer`;
+    return [apiDefenceNote(H, `${title} (not needed on an API response)`,
+      'A response that is not HTML triggers no further requests, so it has no referrer to send.',
+      'Referrer-Policy: no-referrer', ['rest-rp'])];
   }
 
   function apiCorp(value, empty, ctx) {
@@ -1423,7 +1422,7 @@
       status: apiStatus(empty), brief: 'Any site can load the response',
       description: "Without CORP, any site can load this endpoint with a tag such as <script> or <img>. If the browser sends the user's cookies with it, the response, with the user's data, enters that site's process: a response that parses as script can be read directly (Cross-Site Script Inclusion), any response is exposed to Spectre-style reads, and whether it loads tells the site whether the user is signed in. Cross-Origin-Resource-Policy: same-origin makes the browser drop the response first. Browsers that implement opaque response blocking already withhold a JSON, HTML or XML response from such a tag, when the Content-Type is right; CORP asks for the same protection explicitly, from every browser and for every type of response, as defence in depth.",
       verify: 'Does this endpoint answer GET requests with user data, authenticated by cookies? If it does not (it only accepts POST, it authenticates with an Authorization header, or every cookie it relies on is set with SameSite=Lax or Strict), a tag on another site gets nothing of the user\'s and there is nothing here. If it does, this stands: set Cross-Origin-Resource-Policy: same-origin.',
-      sources: ['webdev-corp-api', 'webdev-corp-all', 'mdn-corp-xssi', 'mdn-corp-nocors', 'orb-blocklist', 'fetch-method-get', 'mdn-samesite-lax', 'mdn-samesite-default'],
+      sources: ['webdev-corp-api', 'webdev-corp-all', 'mdn-corp-xssi', 'mdn-corp-spectre', 'mdn-corp-nocors', 'orb-blocklist', 'fetch-method-get', 'mdn-samesite-lax', 'mdn-samesite-default'],
     })];
   }
 

@@ -353,14 +353,16 @@ test('REST API: the cheat sheet headers that every API response needs are settle
   assert.equal(r['strict-transport-security'].findings[0].severity, S.MEDIUM);  // as in page mode
 });
 
-test('REST API: the defence-in-depth headers are checks about whether HTML can come back', () => {
+test('REST API: the defence-in-depth headers are explained, never graded', () => {
   const r = byKey(analyze(BARE, 'basic', 'api'));
-  const checks = [r['content-security-policy'].findings[1], r['permissions-policy'].findings[0], r['referrer-policy'].findings[0]];
-  for (const f of checks) {
-    assert.ok(isContingentFinding(f), f.title);
-    assert.ok(f.verify.startsWith('Can this API return HTML'), f.title);
-    assert.ok(f.sources.includes('rest-dd-uncertain'), f.title);
+  const notes = [r['content-security-policy'].findings[1], r['permissions-policy'].findings[0], r['referrer-policy'].findings[0]];
+  for (const f of notes) {
+    assert.equal(f.severity, S.OK, f.title);
+    assert.equal(f.verify, '', f.title);
+    assert.match(f.title, /not needed on an API response/);
+    assert.ok(f.sources.includes('rest-dd-never'), f.title);
   }
+  assert.ok(!findingList(analyze(BARE, 'basic', 'api')).some((l) => /^(Permissions-Policy|Referrer-Policy):/.test(l.text)));
 });
 
 test('REST API: Cache-Control keeps the page rules, a check on user data, citing the REST cheat sheet', () => {
@@ -389,20 +391,19 @@ test('REST API: X-Frame-Options must be DENY, Referrer-Policy no-referrer, Cache
   const r = byKey(analyze('HTTP/1.1 200 OK\r\nX-Frame-Options: SAMEORIGIN\r\nReferrer-Policy: strict-origin\r\nCache-Control: private\r\n\r\n', 'basic', 'api'));
   assert.equal(r['x-frame-options'].findings[0].severity, S.LOW);
   assert.ok(!isContingentFinding(r['x-frame-options'].findings[0]));
-  assert.equal(r['referrer-policy'].findings[0].severity, S.LOW);
+  assert.equal(r['referrer-policy'].findings[0].severity, S.OK);     // defence in depth: a note
   assert.equal(r['cache-control'].findings[0].severity, S.LOW);
   const ok = byKey(analyze('HTTP/1.1 200 OK\r\nX-Frame-Options: DENY\r\nReferrer-Policy: no-referrer\r\nCache-Control: no-store\r\n\r\n', 'basic', 'api'));
   for (const key of ['x-frame-options', 'referrer-policy', 'cache-control']) assert.equal(ok[key].findings[0].severity, S.OK, key);
 });
 
-test('REST API: Permissions-Policy is OK only when every feature it names is closed', () => {
+test('REST API: Permissions-Policy names the features it leaves open, in a note', () => {
   const closed = byKey(analyze('HTTP/1.1 200 OK\r\nPermissions-Policy: camera=(), geolocation=()\r\n\r\n', 'basic', 'api'));
   assert.equal(closed['permissions-policy'].findings[0].severity, S.OK);
   const open = byKey(analyze('HTTP/1.1 200 OK\r\nPermissions-Policy: camera=*, geolocation=(self), usb=()\r\n\r\n', 'basic', 'api'));
   const f = open['permissions-policy'].findings[0];
-  assert.equal(f.severity, S.LOW);
-  assert.ok(isContingentFinding(f));
-  assert.match(f.title, /camera, geolocation$/);
+  assert.equal(f.severity, S.OK);
+  assert.match(f.title, /allows camera, geolocation \(/);
 });
 
 test('REST API: Content-Type text/html is a check; no charset is asked of JSON', () => {

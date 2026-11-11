@@ -160,7 +160,8 @@ selected, to copy by hand.
 ## Reading the response
 
 - **One response.** The first response in the text is analysed; everything
-  after its header section is body and is ignored. Informational 1xx responses
+  after its header section is body. Only REST API mode reads it, for the
+  Content-Type check. Informational 1xx responses
   in front of it (`100 Continue`, as `curl -i` prints them) are skipped.
 - **Request in front.** A request followed by its response (Burp "copy
   request and response") is skipped up to the first status line. A request
@@ -451,7 +452,7 @@ Absent: **LOW**.
 | Condition | Severity |
 |---|---|
 | `?1` | OK |
-| `?0` | LOW: in Chrome and Edge [it re-enables document.domain][chrome-docdomain-opt-out], which [they otherwise block][chrome-docdomain-115]; other browsers [ignore it][mdn-oac-ignored] and [act only on `?1`][html-oac] |
+| `?0` | LOW: it [requests a site-keyed agent cluster][mdn-oac-site], which [re-enables document.domain][chrome-docdomain-opt-out] where the default is origin-keyed, as in Chrome and Edge [since 115][chrome-docdomain-115]; browsers [are switching the default to `?1`][mdn-oac-default]. In the [HTML Standard][html-oac] `?0` still counts as no header, so where the default has not changed it changes nothing today |
 | Anything else | LOW (as absent) |
 
 ## Service-Worker-Allowed (Extended)
@@ -554,16 +555,20 @@ script, style and other directive checks of Web page mode are not run.
 ### Defence in depth (Basic and Extended)
 
 These headers are [only intended to provide additional security when responses
-are rendered as HTML][rest-dd], and are recommended [if there is any
-uncertainty about the types of information the API returns][rest-dd-uncertain].
-Missing or wrong, each is **LOW, to confirm**, with the same check: can this API
-return HTML, now or in a later version? Never: nothing here. It can, or you
-cannot be sure: the finding stands.
+are rendered as HTML][rest-dd]: [if the API will never return HTML, they may not
+be necessary][rest-dd-never]. In this mode the response is an API response, as
+the user chose, so missing or wrong each is **OK**: an explained note, never
+graded, which still says what the cheat sheet expects.
+
+**Deviation.** The cheat sheet also recommends them [if there is any uncertainty
+about the types of information the API returns][rest-dd-uncertain]. Asking
+whether the API might return HTML would reopen what the mode settles, and,
+taken seriously, would mean grading every header as for a page.
 
 | Header | Expected | Why |
 |---|---|---|
 | Content-Security-Policy | `default-src 'none'` | [Most CSP functionality only affects pages rendered as HTML][rest-csp-dd] |
-| Permissions-Policy | every feature it names closed with `()`, as in the cheat sheet's example; it need not name them all | [Controls browser features][rest-pp]. A feature it allows (`self`, `*`, an origin) is LOW, to confirm, and the title names it |
+| Permissions-Policy | every feature it names closed with `()`, as in the cheat sheet's example; it need not name them all | [Controls browser features][rest-pp]. A feature it allows (`self`, `*`, an origin) is named in the note's title |
 | Referrer-Policy | `no-referrer` | [Non-HTML responses should not trigger additional requests][rest-rp] |
 
 CORS headers keep their Web page rules; the cheat sheet asks to [be as specific
@@ -586,7 +591,7 @@ as possible][rest-cors] with allowed origins.
 CORP acts when another site loads a resource [in no-cors mode][mdn-corp-nocors],
 with a tag such as `<script>` or `<img>`. With `same-origin` the browser drops
 the response before the other site's page gets it. It mitigates [Spectre-style
-attacks and Cross-Site Script Inclusion][mdn-corp-xssi]. On an API with a
+attacks][mdn-corp-spectre] and [Cross-Site Script Inclusion][mdn-corp-xssi]. On an API with a
 signed-in user's data, three attacks are possible without it:
 
 - **Reading the data through `<script>`.** An endpoint that returns JavaScript
@@ -776,14 +781,16 @@ with the passage highlighted.
 - `mdn-acao-null`: [MDN, Access-Control-Allow-Origin][mdn-acao-null]: “Note: The value null should not be used.”
 - `mdn-bamc`: [MDN, CSP block-all-mixed-content][mdn-bamc]: “Warning: This directive is marked as obsolete in the specification.”
 - `mdn-coep-doc`: [MDN, Cross-Origin-Embedder-Policy][mdn-coep-doc]: “configures the current document's policy for loading and embedding cross-origin resources”
-- `mdn-corp-nocors`: [MDN, Cross-Origin Resource Policy (CORP)][mdn-corp-nocors]: “The policy is only effective for no-cors requests”
-- `mdn-corp-xssi`: [MDN, Cross-Origin Resource Policy (CORP)][mdn-corp-xssi]: “to mitigate speculative side-channel attacks, like Spectre, as well as Cross-Site Script Inclusion attacks”
-- `mdn-docdomain-oac`: [MDN, Document.domain][mdn-docdomain-oac]: “If used on an origin-isolated page, i.e., one that uses the Origin-Agent-Cluster HTTP header”
+- `mdn-corp-nocors`: [MDN, Cross-Origin Resource Policy (CORP)][mdn-corp-nocors]: “Use Cross-Origin-Resource-Policy on the resource to block no-cors cross-origin requests”
+- `mdn-corp-spectre`: [MDN, Cross-Origin Resource Policy (CORP)][mdn-corp-spectre]: “to disclose sensitive data, as long as the response bytes enter the embedder”
+- `mdn-corp-xssi`: [MDN, Cross-Origin Resource Policy (CORP)][mdn-corp-xssi]: “Cross-Site Script Inclusion (XSSI) attacks enable obtaining cross-origin data using traditional”
+- `mdn-docdomain-oac`: [MDN, Document.domain][mdn-docdomain-oac]: “If used on an origin-keyed agent cluster page, i.e., one with the Origin-Agent-Cluster HTTP header set to ?1”
 - `mdn-docdomain-shared`: [MDN, Document.domain][mdn-docdomain-shared]: “Similar problems occur with shared hosting sites that give each customer a different subdomain.”
 - `mdn-expectct`: [MDN, Expect-CT][mdn-expectct]: “Only Google Chrome and other Chromium-based browsers implemented Expect-CT, and Chromium has deprecated the header from version 107, because Chromium now enforces CT by default.”
-- `mdn-oac-doc`: [MDN, Origin-Agent-Cluster][mdn-oac-doc]: “is used to request that the associated Document should be placed in an origin-keyed agent cluster”
+- `mdn-oac-default`: [MDN, Origin-Agent-Cluster][mdn-oac-default]: “Browsers are in the process of switching the default from ?0 to ?1.”
+- `mdn-oac-doc`: [MDN, Origin-Agent-Cluster][mdn-oac-doc]: “Requests that the associated Document should be placed in an origin-keyed agent cluster.”
 - `mdn-oac-hint`: [MDN, Origin-Agent-Cluster][mdn-oac-hint]: “Origin-keyed agent clusters should not be viewed as a security feature”
-- `mdn-oac-ignored`: [MDN, Origin-Agent-Cluster][mdn-oac-ignored]: “Values other than ?1 are ignored (e.g., the ?0 structured field for false).”
+- `mdn-oac-site`: [MDN, Origin-Agent-Cluster][mdn-oac-site]: “Requests a site-keyed agent cluster. This enables cross-origin same-site communication, by setting”
 - `mdn-object-src`: [MDN, CSP object-src][mdn-object-src]: “Therefore it is recommended to restrict this fetch-directive”
 - `mdn-pragma`: [MDN, Pragma][mdn-pragma]: “The Pragma header is not specified for HTTP responses and is therefore not a reliable replacement for the HTTP/1.1 Cache-Control header”
 - `mdn-prefetch`: [MDN, CSP prefetch-src][mdn-prefetch]: “Non-standard: This feature is not standardized.”
@@ -834,6 +841,7 @@ with the passage highlighted.
 - `rest-ct-guess`: [OWASP REST Security Cheat Sheet][rest-ct-guess]: “If not specified or if specified incorrectly, a browser might attempt to guess the content type of the response.”
 - `rest-ct-js`: [OWASP REST Security Cheat Sheet][rest-ct-js]: “Ensure sending intended content type headers in your response matching your body content e.g. application/json and not application/javascript.”
 - `rest-dd`: [OWASP REST Security Cheat Sheet][rest-dd]: “The headers below are only intended to provide additional security when responses are rendered as HTML.”
+- `rest-dd-never`: [OWASP REST Security Cheat Sheet][rest-dd-never]: “if the API will never return HTML in responses, then these headers may not be necessary”
 - `rest-dd-uncertain`: [OWASP REST Security Cheat Sheet][rest-dd-uncertain]: “if there is any uncertainty about the function of the headers, or the types of information that the API returns (or may return in future), then it is recommended to include them as part of a defense-in-depth approach”
 - `rest-fa`: [OWASP REST Security Cheat Sheet][rest-fa]: “For an API response, there is no requirement to be framed in any of those elements.”
 - `rest-fa-dnd`: [OWASP REST Security Cheat Sheet][rest-fa-dnd]: “This header protects against drag-and-drop style clickjacking attacks.”
@@ -1036,14 +1044,16 @@ with the passage highlighted.
 [mdn-acao-null]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Access-Control-Allow-Origin#:~:text=Note%3A%20The%20value%20null%20should%20not%20be%20used.
 [mdn-bamc]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/block-all-mixed-content#:~:text=Warning%3A%20This%20directive%20is%20marked%20as%20obsolete%20in%20the%20specification.
 [mdn-coep-doc]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cross-Origin-Embedder-Policy#:~:text=configures%20the%20current%20document's%20policy%20for%20loading%20and%20embedding%20cross%2Dorigin%20resources
-[mdn-corp-nocors]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cross-Origin_Resource_Policy#:~:text=The%20policy%20is%20only%20effective%20for%20no%2Dcors%20requests
-[mdn-corp-xssi]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cross-Origin_Resource_Policy#:~:text=to%20mitigate%20speculative%20side%2Dchannel%20attacks%2C%20like%20Spectre%2C%20as%20well%20as%20Cross%2DSite%20Script%20Inclusion%20attacks
-[mdn-docdomain-oac]: https://developer.mozilla.org/en-US/docs/Web/API/Document/domain#:~:text=If%20used%20on%20an%20origin%2Disolated%20page%2C%20i.e.%2C%20one%20that%20uses%20the%20Origin%2DAgent%2DCluster%20HTTP%20header
+[mdn-corp-nocors]: https://developer.mozilla.org/en-US/docs/Web/Security/Practical_implementation_guides/CORP#:~:text=Use%20Cross%2DOrigin%2DResource%2DPolicy%20on%20the%20resource%20to%20block%20no%2Dcors%20cross%2Dorigin%20requests
+[mdn-corp-spectre]: https://developer.mozilla.org/en-US/docs/Web/Security/Practical_implementation_guides/CORP#:~:text=to%20disclose%20sensitive%20data%2C%20as%20long%20as%20the%20response%20bytes%20enter%20the%20embedder
+[mdn-corp-xssi]: https://developer.mozilla.org/en-US/docs/Web/Security/Practical_implementation_guides/CORP#:~:text=Cross%2DSite%20Script%20Inclusion%20(XSSI)%20attacks%20enable%20obtaining%20cross%2Dorigin%20data%20using%20traditional
+[mdn-docdomain-oac]: https://developer.mozilla.org/en-US/docs/Web/API/Document/domain#:~:text=If%20used%20on%20an%20origin%2Dkeyed%20agent%20cluster%20page%2C%20i.e.%2C%20one%20with%20the%20Origin%2DAgent%2DCluster%20HTTP%20header%20set%20to%20%3F1
 [mdn-docdomain-shared]: https://developer.mozilla.org/en-US/docs/Web/API/Document/domain#:~:text=Similar%20problems%20occur%20with%20shared%20hosting%20sites%20that%20give%20each%20customer%20a%20different%20subdomain.
 [mdn-expectct]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Expect-CT#:~:text=Only%20Google%20Chrome%20and%20other,now%20enforces%20CT%20by%20default.
-[mdn-oac-doc]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Origin-Agent-Cluster#:~:text=is%20used%20to%20request%20that%20the%20associated%20Document%20should%20be%20placed%20in%20an%20origin%2Dkeyed%20agent%20cluster
+[mdn-oac-default]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Origin-Agent-Cluster#:~:text=Browsers%20are%20in%20the%20process%20of%20switching%20the%20default%20from%20%3F0%20to%20%3F1.
+[mdn-oac-doc]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Origin-Agent-Cluster#:~:text=Requests%20that%20the%20associated%20Document%20should%20be%20placed%20in%20an%20origin%2Dkeyed%20agent%20cluster.
 [mdn-oac-hint]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Origin-Agent-Cluster#:~:text=Origin%2Dkeyed%20agent%20clusters%20should%20not%20be%20viewed%20as%20a%20security%20feature
-[mdn-oac-ignored]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Origin-Agent-Cluster#:~:text=Values%20other%20than%20%3F1%20are%20ignored%20(e.g.%2C%20the%20%3F0%20structured%20field%20for%20false).
+[mdn-oac-site]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Origin-Agent-Cluster#:~:text=Requests%20a%20site%2Dkeyed%20agent%20cluster.%20This%20enables%20cross%2Dorigin%20same%2Dsite%20communication%2C%20by%20setting
 [mdn-object-src]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/object-src#:~:text=Therefore%20it%20is%20recommended%20to%20restrict%20this%20fetch%2Ddirective
 [mdn-pragma]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Pragma#:~:text=The%20Pragma%20header%20is%20not,for%20the%20HTTP%2F1.1%20Cache%2DControl%20header
 [mdn-prefetch]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/prefetch-src#:~:text=Non%2Dstandard%3A%20This%20feature%20is%20not%20standardized.
@@ -1094,6 +1104,7 @@ with the passage highlighted.
 [rest-ct-guess]: https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#:~:text=If%20not%20specified%20or%20if%20specified%20incorrectly%2C%20a%20browser%20might%20attempt%20to%20guess%20the%20content%20type%20of%20the%20response.
 [rest-ct-js]: https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#:~:text=Ensure%20sending%20intended%20content%20type%20headers%20in%20your%20response%20matching%20your%20body%20content%20e.g.%20application%2Fjson%20and%20not%20application%2Fjavascript.
 [rest-dd]: https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#:~:text=The%20headers%20below%20are%20only%20intended%20to%20provide%20additional%20security%20when%20responses%20are%20rendered%20as%20HTML.
+[rest-dd-never]: https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#:~:text=if%20the%20API%20will%20never%20return%20HTML%20in%20responses%2C%20then%20these%20headers%20may%20not%20be%20necessary
 [rest-dd-uncertain]: https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#:~:text=However%2C%20if%20there%20is%20any%20uncertainty%20about%20the%20function%20of%20the%20headers,as%20part%20of%20a%20defense%2Din%2Ddepth%20approach
 [rest-fa]: https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#:~:text=For%20an%20API%20response%2C%20there%20is%20no%20requirement%20to%20be%20framed%20in%20any%20of%20those%20elements.
 [rest-fa-dnd]: https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#:~:text=This%20header%20protects%20against%20drag%2Dand%2Ddrop%20style%20clickjacking%20attacks.
