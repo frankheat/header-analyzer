@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <!-- The app never talks to the network: everything it analyses stays in this tab. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZpdEWBRZc8YWHOGmH0srr36MDMtAe/bE3Yl+XzWsXAE=' 'sha256-AkrbKMsLkaf7r4Ymr0TzOSl7EUPlpfycU7ZaDze8BSA='; style-src 'sha256-7ZQELK3gg7JyzYWkiAPLGlUWf4+XbwTA/AUZg4FvM4M='; img-src data:; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZpdEWBRZc8YWHOGmH0srr36MDMtAe/bE3Yl+XzWsXAE=' 'sha256-AkrbKMsLkaf7r4Ymr0TzOSl7EUPlpfycU7ZaDze8BSA='; style-src 'sha256-v1puY19Ix3FgNBhnzDtGKaJMBaewWs+sn7xdWE2Kakg='; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="color-scheme" content="light dark">
   <meta name="description" content="Header Analyzer analyses the security headers of a raw HTTP response, entirely in your browser.">
@@ -564,7 +564,7 @@ svg { fill: currentColor; }
 .check-outcomes strong { font-weight: 500; }
 
 /* Language switch: a compact segmented pair, the active language highlighted */
-.segmented.lang-switch { height: 32px; margin: 0 4px; }
+.segmented.lang-switch { height: 32px; margin: 0 4px 0 8px; }
 .segmented.lang-switch button { min-width: 0; padding: 0 10px; font-size: 13px; letter-spacing: 0.5px; }
 .segmented.lang-switch button:first-child { border-radius: 16px 0 0 16px; }
 .segmented.lang-switch button:last-child { border-radius: 0 16px 16px 0; }
@@ -574,7 +574,7 @@ svg { fill: currentColor; }
   .top-app-bar { column-gap: 8px; }
   .app-bar-title { gap: 8px; }
   .app-bar-title h1 { font-size: 20px; }
-  .segmented.lang-switch { margin: 0 2px; }
+  .segmented.lang-switch { margin: 0 0 0 4px; }
   .segmented.lang-switch button { padding: 0 7px; }
 }
 
@@ -643,14 +643,14 @@ svg { fill: currentColor; }
         </button>
         <div class="menu" id="samples-menu" role="menu" aria-labelledby="samples-button" hidden></div>
       </div>
-      <div class="segmented lang-switch" role="radiogroup" aria-label="Language" data-i18n-attr="aria-label:language" id="lang-control">
-        <button type="button" role="radio" data-lang="en" lang="en" title="English" aria-checked="true">EN</button>
-        <button type="button" role="radio" data-lang="it" lang="it" title="Italiano" aria-checked="false">IT</button>
-      </div>
       <button type="button" class="icon-button theme-toggle" id="theme-button" title="Switch to dark theme" aria-label="Switch to dark theme">
         <svg class="ic-dark" aria-hidden="true"><use href="#i-dark"></use></svg>
         <svg class="ic-light" aria-hidden="true"><use href="#i-light"></use></svg>
       </button>
+      <div class="segmented lang-switch" role="radiogroup" aria-label="Language" data-i18n-attr="aria-label:language" id="lang-control">
+        <button type="button" role="radio" data-lang="en" lang="en" title="English" aria-checked="true">EN</button>
+        <button type="button" role="radio" data-lang="it" lang="it" title="Italiano" aria-checked="false">IT</button>
+      </div>
     </nav>
   </header>
 

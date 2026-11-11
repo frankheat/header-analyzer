@@ -551,7 +551,7 @@ svg { fill: currentColor; }
 .check-outcomes strong { font-weight: 500; }
 
 /* Language switch: a compact segmented pair, the active language highlighted */
-.segmented.lang-switch { height: 32px; margin: 0 4px; }
+.segmented.lang-switch { height: 32px; margin: 0 4px 0 8px; }
 .segmented.lang-switch button { min-width: 0; padding: 0 10px; font-size: 13px; letter-spacing: 0.5px; }
 .segmented.lang-switch button:first-child { border-radius: 16px 0 0 16px; }
 .segmented.lang-switch button:last-child { border-radius: 0 16px 16px 0; }
@@ -561,6 +561,6 @@ svg { fill: currentColor; }
   .top-app-bar { column-gap: 8px; }
   .app-bar-title { gap: 8px; }
   .app-bar-title h1 { font-size: 20px; }
-  .segmented.lang-switch { margin: 0 2px; }
+  .segmented.lang-switch { margin: 0 0 0 4px; }
   .segmented.lang-switch button { padding: 0 7px; }
 }
