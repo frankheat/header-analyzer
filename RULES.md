@@ -145,8 +145,7 @@ Besides the detailed report, the findings can be copied as one line per header:
 - **Several problems in one header:** each header appears once. The line takes the
   status of its most severe problem (on a tie: Missing, then Misconfigured, then
   Deprecated, then Duplicated). The short descriptions are joined with `; ` from most
-  to least severe; at most three are shown, and the rest are counted as "and N more".
-  The detailed row of the header lists every problem.
+  to least severe, every one of them; the detailed row of the header explains each.
 - **Order:** by the most severe problem of each header.
 - **Once per header:** in each of the three lists a header has at most one line.
 

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <!-- The app never talks to the network: everything it analyses stays in this tab. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZpdEWBRZc8YWHOGmH0srr36MDMtAe/bE3Yl+XzWsXAE=' 'sha256-jxAnsc0T8LUYXTEuBcDAnH1mY7Xo2ZA3Gmll/R1N69I='; style-src 'sha256-v1puY19Ix3FgNBhnzDtGKaJMBaewWs+sn7xdWE2Kakg='; img-src data:; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZpdEWBRZc8YWHOGmH0srr36MDMtAe/bE3Yl+XzWsXAE=' 'sha256-9rKDzUlnp6aNmrff1afUPkQQ+PmRgaIzA1crszw8uR8='; style-src 'sha256-v1puY19Ix3FgNBhnzDtGKaJMBaewWs+sn7xdWE2Kakg='; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="color-scheme" content="light dark">
   <meta name="description" content="Header Analyzer analyses the security headers of a raw HTTP response, entirely in your browser.">
@@ -4482,7 +4482,6 @@ globalThis.HeaderAnalyzer.i18n.module(function (HL, L) {
     [Status.DUPLICATED]: L('Duplicated', 'Duplicato'),
     [Status.DEPRECATED]: L('Deprecated', 'Deprecato'),
   };
-  const MAX_BRIEFS = 3;
 
   /** "Sent 2 times" → "sent 2 times" inside a sentence; "SAMEORIGIN …" and "'none' …" stay. */
   function midSentence(brief) {
@@ -4494,8 +4493,8 @@ globalThis.HeaderAnalyzer.i18n.module(function (HL, L) {
    *
    * Each header's listed findings are merged. The status is the one of the most
    * severe finding (STATUS_PRECEDENCE breaks ties). The brief joins the
-   * findings' briefs, most severe first, with "; ", keeping at most MAX_BRIEFS
-   * and summing up the rest as "and N more"; the detailed report has them all.
+   * findings' briefs, most severe first, with "; ": every one of them, so the
+   * line is as complete as the detailed report, only shorter.
    *
    * Every finding with a severity is listed (OK notes never are). `show`
    * selects which: 'all' (the default), 'confirmed' (only findings the response
@@ -4529,9 +4528,7 @@ globalThis.HeaderAnalyzer.i18n.module(function (HL, L) {
       items.sort((a, b) => b.severity - a.severity
         || STATUS_PRECEDENCE.indexOf(a.status) - STATUS_PRECEDENCE.indexOf(b.status));
       const top = items[0];
-      const shown = items.slice(0, MAX_BRIEFS).map((it, k) => (k === 0 ? it.brief : midSentence(it.brief)));
-      const rest = items.length - shown.length;
-      const brief = shown.join('; ') + (rest > 0 ? L(`; and ${rest} more`, `; e altri ${rest}`) : '');
+      const brief = items.map((it, k) => (k === 0 ? it.brief : midSentence(it.brief))).join('; ');
       lines.push({
         header: r.name,
         status: top.status,

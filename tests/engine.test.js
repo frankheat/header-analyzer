@@ -200,7 +200,7 @@ test('the list: statuses, ordering, options, one line per header', () => {
   const list = HL.engine.findingList(r);
   const texts = list.map((l) => l.text);
   assert.ok(texts.includes('Content-Security-Policy: Missing. No defence in depth against XSS.'));
-  assert.ok(texts.includes('Strict-Transport-Security: Misconfigured. max-age=1 is below the 2-year minimum; includeSubDomains is not set; preload is not set (to confirm); and 1 more.'));
+  assert.ok(texts.includes('Strict-Transport-Security: Misconfigured. max-age=1 is below the 2-year minimum; includeSubDomains is not set; preload is not set (to confirm); sent 2 times with conflicting values.'));
   assert.ok(texts.includes('X-XSS-Protection: Deprecated. Enables the obsolete XSS filter.'));
   assert.ok(texts.includes('Expect-CT: Deprecated. Obsolete, ignored by browsers.'));
   assert.ok(texts.includes('Cache-Control: Misconfigured. Shared caches may store the response (to confirm).'));
@@ -251,8 +251,8 @@ test('a merged line: status of the most severe problem, briefs joined, the rest 
   assert.equal(csp.severity, 'MEDIUM');
   assert.ok(csp.brief.startsWith("'unsafe-inline' allowed for scripts in script-src; "));   // MEDIUMs keep report order
   assert.ok(csp.items.every((it, k) => k === 0 || S[it.severity] <= S[csp.items[k - 1].severity]));
-  assert.match(csp.brief, /; and \d+ more$/);
-  assert.equal(csp.brief.split('; ').length, 4);                   // three briefs + "and N more"
+  assert.ok(!/ more$/.test(csp.brief));                            // nothing is cut
+  assert.equal(csp.brief.split('; ').length, csp.items.length);     // one brief per problem
   assert.ok(csp.items.length > 3);
   assert.equal(csp.items[0].severity, 'MEDIUM');
 

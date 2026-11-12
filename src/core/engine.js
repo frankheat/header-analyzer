@@ -85,7 +85,6 @@ globalThis.HeaderAnalyzer.i18n.module(function (HL, L) {
     [Status.DUPLICATED]: L('Duplicated', 'Duplicato'),
     [Status.DEPRECATED]: L('Deprecated', 'Deprecato'),
   };
-  const MAX_BRIEFS = 3;
 
   /** "Sent 2 times" → "sent 2 times" inside a sentence; "SAMEORIGIN …" and "'none' …" stay. */
   function midSentence(brief) {
@@ -97,8 +96,8 @@ globalThis.HeaderAnalyzer.i18n.module(function (HL, L) {
    *
    * Each header's listed findings are merged. The status is the one of the most
    * severe finding (STATUS_PRECEDENCE breaks ties). The brief joins the
-   * findings' briefs, most severe first, with "; ", keeping at most MAX_BRIEFS
-   * and summing up the rest as "and N more"; the detailed report has them all.
+   * findings' briefs, most severe first, with "; ": every one of them, so the
+   * line is as complete as the detailed report, only shorter.
    *
    * Every finding with a severity is listed (OK notes never are). `show`
    * selects which: 'all' (the default), 'confirmed' (only findings the response
@@ -132,9 +131,7 @@ globalThis.HeaderAnalyzer.i18n.module(function (HL, L) {
       items.sort((a, b) => b.severity - a.severity
         || STATUS_PRECEDENCE.indexOf(a.status) - STATUS_PRECEDENCE.indexOf(b.status));
       const top = items[0];
-      const shown = items.slice(0, MAX_BRIEFS).map((it, k) => (k === 0 ? it.brief : midSentence(it.brief)));
-      const rest = items.length - shown.length;
-      const brief = shown.join('; ') + (rest > 0 ? L(`; and ${rest} more`, `; e altri ${rest}`) : '');
+      const brief = items.map((it, k) => (k === 0 ? it.brief : midSentence(it.brief))).join('; ');
       lines.push({
         header: r.name,
         status: top.status,
