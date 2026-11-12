@@ -377,7 +377,18 @@ svg { fill: currentColor; }
 
 .chip-set { display: flex; flex-wrap: wrap; gap: 8px; }
 .filter-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
-.copy-anchor { margin-left: auto; }
+.copy-anchor { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px 8px; }
+.tonal-button:disabled { background: color-mix(in srgb, var(--md-on-surface) 12%, transparent); color: color-mix(in srgb, var(--md-on-surface) 38%, transparent); cursor: default; }
+/* Beside a disabled copy button: how many findings are left to confirm, and a way to them. */
+.copy-pending {
+  position: relative; isolation: isolate; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px;
+  border: 0; border-radius: 16px; background: transparent; color: var(--md-primary);
+  font-size: 13px; font-weight: 500; letter-spacing: 0.1px; cursor: pointer;
+}
+.copy-pending svg { width: 16px; height: 16px; fill: currentColor; }
+.copy-pending::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: currentColor; opacity: 0; transition: opacity 0.15s linear; }
+.copy-pending:hover::after { opacity: 0.08; }
+.copy-pending:focus-visible { outline: 2px solid var(--md-primary); outline-offset: 2px; }
 .menu button:disabled { color: var(--md-on-surface); opacity: 0.38; cursor: default; }
 
 /* Manual copy dialog (M3 basic dialog) */

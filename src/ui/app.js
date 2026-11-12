@@ -105,13 +105,10 @@
       trySample: 'Try a sample', technicalDetails: 'Technical details',
       internalTitle: 'Header Analyzer hit an internal error', internal: 'This is a bug in Header Analyzer, not a verdict about the response. Please report it with the details below (they contain no part of your input).',
       nothingToAnalyse: 'Nothing to analyse',
-      showAll: 'All findings', showAllDetail: 'Every header with a finding',
-      showConfirmed: 'Confirmed', showConfirmedDetail: 'Settled by the response, or checked by you',
-      showToConfirm: 'To confirm', showToConfirmDetail: 'Depend on a check the response cannot show',
       copyFindings: 'Copy findings',
-      copiedAll: (n) => `${n} finding${n === 1 ? '' : 's'} copied`,
       copiedConfirmed: (n) => `${n} confirmed finding${n === 1 ? '' : 's'} copied`,
-      copiedToConfirm: (n) => `${n} finding${n === 1 ? '' : 's'} to confirm copied`,
+      pendingHint: (n) => `${n} still to confirm`,
+      pendingTitle: 'Confirm or exclude every finding to confirm before copying',
       readingNotes: (n) => `Reading notes (${n})`,
       show: 'Show', all: 'All', issues: 'Issues', toConfirm: 'To confirm', passing: 'Passing',
       search: 'Search headers and findings',
@@ -145,13 +142,10 @@
       trySample: 'Prova un esempio', technicalDetails: 'Dettagli tecnici',
       internalTitle: 'Header Analyzer ha avuto un errore interno', internal: 'È un bug di Header Analyzer, non un giudizio sulla risposta. Segnalalo con i dettagli qui sotto (non contengono nulla del tuo input).',
       nothingToAnalyse: 'Niente da analizzare',
-      showAll: 'Tutti i finding', showAllDetail: 'Ogni header con un finding',
-      showConfirmed: 'Confermati', showConfirmedDetail: 'Certi dalla risposta, o verificati da te',
-      showToConfirm: 'Da confermare', showToConfirmDetail: 'Dipendono da una verifica che la risposta non può mostrare',
       copyFindings: 'Copia i finding',
-      copiedAll: (n) => (n === 1 ? '1 finding copiato' : `${n} finding copiati`),
       copiedConfirmed: (n) => (n === 1 ? '1 finding confermato copiato' : `${n} finding confermati copiati`),
-      copiedToConfirm: (n) => (n === 1 ? '1 finding da confermare copiato' : `${n} finding da confermare copiati`),
+      pendingHint: (n) => `Ancora ${n} da confermare`,
+      pendingTitle: 'Conferma o escludi tutti i finding da confermare prima di copiare',
       readingNotes: (n) => `Note di lettura (${n})`,
       show: 'Mostra', all: 'Tutti', issues: 'Problemi', toConfirm: 'Da confermare', passing: 'Superati',
       search: 'Cerca header e finding',
@@ -433,35 +427,32 @@
 
   /**
    * The findings list for a report: one `- <Header>: <status>. <brief>.` line
-   * per header, copied from a menu. All, only the findings the response
-   * settles, or only those to confirm.
+   * per header, confirmed findings only. It can be copied only once nothing is
+   * left to confirm, so what reaches a report has been looked at: until then
+   * the button is disabled and a link beside it says how many are left and
+   * opens them. `report` is the report as the user's decisions leave it.
    */
-  const LIST_SHOW = [
-    ['all', 'showAll', 'showAllDetail'],
-    ['confirmed', 'showConfirmed', 'showConfirmedDetail'],
-    ['toConfirm', 'showToConfirm', 'showToConfirmDetail'],
-  ];
-
-  function copyMenu(report) {
+  function copyControl(report) {
+    const pending = report.results.reduce((n, r) => n + r.findings.filter(isContingent).length, 0);
+    const lines = core().findingList(report, { show: 'confirmed' });
     const button = el('button', {
       className: 'tonal-button',
-      attrs: { type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-controls': 'copy-menu', id: 'copy-button' },
-    }, icon('i-copy'), tr('copyFindings'), icon('i-expand', 'trailing'));
-    const menu = el('div', { className: 'menu', attrs: { id: 'copy-menu', role: 'menu', 'aria-labelledby': 'copy-button' } });
-    menu.hidden = true;
-    for (const [id, label, detail] of LIST_SHOW) {
-      const count = core().findingList(report, { show: id }).length;
-      menu.append(el('button', {
-        className: 'two-line',
-        attrs: { type: 'button', role: 'menuitem', 'data-show': id, disabled: !count },
-      }, el('span', null, `${tr(label)} · ${count}`, el('span', { className: 'menu-detail', text: tr(detail) }))));
-    }
-    initMenu(button, menu, (item) => {
-      const lines = core().findingList(report, { show: item.dataset.show });
-      const done = { all: tr('copiedAll', lines.length), confirmed: tr('copiedConfirmed', lines.length), toConfirm: tr('copiedToConfirm', lines.length) }[item.dataset.show];
-      copyText(lines.map((l) => `- ${l.text}`).join('\n'), done);
-    });
-    return el('div', { className: 'menu-anchor copy-anchor' }, button, menu);
+      attrs: { type: 'button', id: 'copy-button', disabled: pending > 0 || !lines.length, 'aria-describedby': pending ? 'copy-pending' : null },
+      on: { click: () => copyText(lines.map((l) => `- ${l.text}`).join('\n'), tr('copiedConfirmed', lines.length)) },
+    }, icon('i-copy'), tr('copyFindings'));
+    const hint = pending ? el('button', {
+      className: 'copy-pending',
+      attrs: { type: 'button', id: 'copy-pending', title: tr('pendingTitle') },
+      on: {
+        click: () => {
+          state.filter = 'confirm';
+          render();
+          const chip = document.querySelector('[data-filter="confirm"]');
+          if (chip) chip.focus();
+        },
+      },
+    }, icon('i-help'), tr('pendingHint', pending)) : null;
+    return el('div', { className: 'copy-anchor' }, hint, button);
   }
 
   function notesCard(notes) {
@@ -523,7 +514,7 @@
     });
     return el('div', { className: 'filter-bar' },
       el('label', { className: 'search-bar' }, icon('i-search'), input),
-      el('div', { className: 'filter-row' }, chips, copyMenu(view)));
+      el('div', { className: 'filter-row' }, chips, copyControl(view)));
   }
 
   function listSections(report, view) {

@@ -51,9 +51,10 @@ check: a JSON body declared as `text/html` or as JavaScript.
   `<Header>: <Missing | Misconfigured | Duplicated | Deprecated>. <brief description>.`
   (Missing means absent where the header should be sent: a header that is
   correct to omit, such as X-XSS-Protection, is never listed),
-  as a bulleted list. Its menu chooses what to copy: **All** findings, only the
-  **Confirmed** ones (settled by the response), or only those **To confirm**.
-  Each header appears once per list.
+  as a bulleted list, for every confirmed finding: those the response settles
+  and those you confirmed. It is available only once nothing is left to
+  confirm; until then it says how many are left and takes you to them, so
+  nothing reaches a report unchecked. Each header appears once.
 - **Checks you record.** A finding to confirm has two buttons, **Confirmed** and
   **Excluded**. A confirmed finding counts as settled, like the others; an
   excluded one leaves the badges and the copied lists.

@@ -131,15 +131,15 @@ Besides the detailed report, the findings can be copied as one line per header:
 | Deprecated | The header uses an obsolete or no longer recommended feature (X-XSS-Protection, Expect-CT, X-Download-Options, X-Frame-Options ALLOW-FROM, obsolete CSP directives). |
 
 - **Listed:** every finding with a severity. OK notes never are.
-- **All / Confirmed / To confirm:** the copy menu chooses what the list holds:
-  every finding, only those the response settles, or only those that need a
-  check (each ending with "(to confirm)"). A header with both kinds
-  appears under Confirmed and under To confirm, each time with the findings of
-  that kind.
+- **Confirmed only, once nothing is left to confirm:** the copied list holds
+  the findings the response settles and those the user confirmed. While any
+  finding is still to confirm, the button is disabled and a link beside it
+  gives the count and opens the "To confirm" filter: every check is decided
+  before a line reaches a report.
 - **Checks recorded by the user:** a finding to confirm can be marked
-  Confirmed or Excluded under it. Confirmed moves it to the Confirmed list with
-  its severity unchanged, written like any settled finding; Excluded removes it
-  from every list and from the row's badge. The row badge and the "+N" marker
+  Confirmed or Excluded under it. Confirmed puts it in the copied list with its
+  severity unchanged, written like any settled finding; Excluded removes it
+  from the list and from the row's badge. The row badge and the "+N" marker
   follow these choices; the "To confirm" filter keeps showing the row, so a
   choice can be changed. Nothing is stored: a new analysis starts with none.
 - **Several problems in one header:** each header appears once. The line takes the
@@ -147,9 +147,9 @@ Besides the detailed report, the findings can be copied as one line per header:
   Deprecated, then Duplicated). The short descriptions are joined with `; ` from most
   to least severe, every one of them; the detailed row of the header explains each.
 - **Order:** by the most severe problem of each header.
-- **Once per header:** in each of the three lists a header has at most one line.
+- **Once per header:** a header has at most one line.
 
-The **Copy findings** button, next to the result filters, puts the chosen list
+The **Copy findings** button, next to the result filters, puts the list
 on the clipboard as a bulleted list, and says how many lines it copied. Where
 the page may not write to the clipboard, the list opens in a dialog, already
 selected, to copy by hand.
