@@ -368,7 +368,7 @@ test('REST API: the defence-in-depth headers are explained, never graded', () =>
 test('REST API: Cache-Control keeps the page rules, a check on user data, citing the REST cheat sheet', () => {
   const missing = byKey(analyze(BARE, 'basic', 'api'))['cache-control'].findings[0];
   assert.ok(isContingentFinding(missing));
-  assert.equal(missing.verify, "Does the response carry a signed-in user's data?");
+  assert.equal(missing.verify, 'Is the response visible only to signed-in users (content that is not public)?');
   assert.ok(missing.sources.includes('rest-cc'));
   const shared = byKey(analyze('HTTP/1.1 200 OK\r\nCache-Control: public, max-age=3600\r\n\r\n', 'basic', 'api'))['cache-control'].findings[0];
   assert.equal(shared.severity, S.MEDIUM);

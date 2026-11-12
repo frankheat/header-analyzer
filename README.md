@@ -89,7 +89,7 @@ check: a JSON body declared as `text/html` or as JavaScript.
 
 Some verdicts depend on something a saved response cannot show. Does the page use
 the camera? Is this endpoint's CORS origin reflected or allowlisted? Does this
-response carry a signed-in user's data? Those findings carry the check that
+response show content only signed-in users may see? Those findings carry the check that
 settles them: a closed question or an action, then the answer that confirms
 the finding and the one that excludes it. Their severity is what the response
 shows; the worst case a check could reveal is stated in the check itself. They are

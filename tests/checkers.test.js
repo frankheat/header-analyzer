@@ -346,7 +346,7 @@ test('every caching verdict but no-store carries the same single question', () =
   }
   checks.add(absent('cache-control').findings[0].verify);
   assert.equal(checks.size, 1);
-  assert.equal([...checks][0], "Does the response carry a signed-in user's data?");
+  assert.equal([...checks][0], 'Is the response visible only to signed-in users (content that is not public)?');
   // The Authorization nuance stays in the shared-cache description.
   const shared = findingsFor('Cache-Control', 'max-age=600')[0].description;
   for (const w of ['Authorization header', 'public', 's-maxage', 'must-revalidate']) assert.ok(shared.includes(w));

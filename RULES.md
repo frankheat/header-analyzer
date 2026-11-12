@@ -373,8 +373,10 @@ Absent: **LOW**, to confirm. When the response carries Pragma instead, in any
 profile, the finding adds that [Pragma's meaning in a response was never
 specified][rfc9111-pragma-response], so it [does not replace
 Cache-Control][mdn-pragma]. Every verdict except `no-store` asks one question:
-does the response carry a signed-in user's data, and is the user identified by
-a cookie or by an Authorization header ([RFC 9111 §3.5][rfc9111-auth])?
+is the response visible only to signed-in users (content that is not public,
+not only a user's personal data)? Where requests carry an Authorization
+header, [RFC 9111 §3.5][rfc9111-auth] already keeps shared caches from reusing
+the response; the shared-cache finding says so in its description.
 
 | Condition | Severity |
 |---|---|
@@ -534,7 +536,7 @@ changes is the criterion.
 | Content-Type | the type of the body | **LOW** | [Must be specified as per the content returned][rest-ct], or [a browser might guess it][rest-ct-guess]; [ASVS 4.1.1][asvs-4.1.1]. An invalid value is LOW as well. No charset is asked of `application/json`: ASVS 4.1.1 asks for it on text and XML types |
 | Content-Type `text/html` | | LOW, to confirm | Is the body really HTML? If not, this stands. Settled by the pasted body (below) |
 | Content-Type of a [JavaScript MIME type][mimesniff-js] | | LOW, to confirm | The cheat sheet: [application/json and not application/javascript][rest-ct-js]. Another site can run it with `<script src>` ([Cross-Site Script Inclusion][mdn-corp-xssi]). Is the body really JavaScript? If not, this stands. Settled by the pasted body when it is JSON (below) |
-| Cache-Control | `no-store` | as in Web page mode: a check on whether the response carries a signed-in user's data | The cheat sheet asks for no-store, [not stored by private or shared caches][rest-cc], on every API response. *Deviation:* the tool asks for it where the response carries a user's data, as in Web page mode, because a cached public response exposes no one |
+| Cache-Control | `no-store` | as in Web page mode: a check on whether the response is visible only to signed-in users | The cheat sheet asks for no-store, [not stored by private or shared caches][rest-cc], on every API response. *Deviation:* the tool asks for it where the response carries a user's data, as in Web page mode, because a cached public response exposes no one |
 | Strict-Transport-Security | as in Web page mode | as in Web page mode | Same rules, same severities |
 | X-Content-Type-Options | `nosniff` | as in Web page mode | Same rules |
 | X-Frame-Options | `DENY` | **LOW** | [Still recommended for browsers without CSP Level 2][rest-xfo]. `SAMEORIGIN` is LOW: [no API response needs framing][rest-fa]. *Deviation:* the OWASP HTTP Headers Cheat Sheet says it [does not provide any security][cs-xfo-api] on a JSON API; the REST Security Cheat Sheet, the reference for this mode, still recommends it. Next to a `frame-ancestors` that lets any site frame the response, a note says browsers [ignore this header][csp3-fa-xfo], as in Web page mode |
